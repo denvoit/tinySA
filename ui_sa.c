@@ -580,30 +580,34 @@ static UI_FUNCTION_ADV_CALLBACK(menu_scanning_speed_acb)
   ui_mode_normal();
 }
 
+#define CONFIG_MENUITEM_TOUCH_CAL   0
+#define CONFIG_MENUITEM_TOUCH_TEST  1
+#define CONFIG_MENUITEM_SELFTEST    2
+#define CONFIG_MENUITEM_VERSION     3
 static UI_FUNCTION_CALLBACK(menu_config_cb)
 {
-  (void)data;
-  switch (item) {
-  case 0:
+  (void)item;
+  switch (data) {
+  case CONFIG_MENUITEM_TOUCH_CAL:
     touch_cal_exec();
     redraw_frame();
     request_to_redraw_grid();
     draw_menu();
     break;
-  case 1:
+  case CONFIG_MENUITEM_TOUCH_TEST:
     touch_draw_test();
     redraw_frame();
     request_to_redraw_grid();
     draw_menu();
     break;
-  case 2:
+  case CONFIG_MENUITEM_SELFTEST:
     sweep_mode = 0;         // Suspend sweep to save time
     menu_move_back_and_leave_ui();
     setting.test = 0;
     setting.test_argument = 0;
     sweep_mode = SWEEP_SELFTEST;
     break;
-  case 4:
+  case CONFIG_MENUITEM_VERSION:
     show_version();
     redraw_frame();
     request_to_redraw_grid();
@@ -1238,6 +1242,34 @@ static UI_FUNCTION_ADV_CALLBACK(menu_points_acb){
   draw_menu();
 }
 
+#ifdef __USE_SERIAL_CONSOLE__
+static UI_FUNCTION_ADV_CALLBACK(menu_serial_speed_acb)
+{
+  (void)item;
+  if (b){
+    b->icon = config._serial_speed == data ? BUTTON_ICON_GROUP_CHECKED : BUTTON_ICON_GROUP;
+    b->param_1.u = USART_GET_SPEED(data);
+    return;
+  }
+  config._serial_speed = data;
+  shell_update_speed();
+  draw_menu();
+}
+
+static UI_FUNCTION_ADV_CALLBACK(menu_connection_acb)
+{
+  (void)item;
+  if (b){
+    b->icon = (config._mode&_MODE_CONNECTION_MASK) == data ? BUTTON_ICON_GROUP_CHECKED : BUTTON_ICON_GROUP;
+    return;
+  }
+  config._mode&=~_MODE_CONNECTION_MASK;
+  config._mode|=data;
+  shell_reset_console();
+  draw_menu();
+}
+#endif
+
 // ===[MENU DEFINITION]=========================================================
 #if 0
 static const menuitem_t menu_store_preset_high[8] =
@@ -1626,12 +1658,57 @@ static const menuitem_t menu_calibrate[] =
   { MT_FORM | MT_NONE,     0, NULL, NULL } // sentinel
 };
 
+#ifdef __USE_SERIAL_CONSOLE__
+//19200, 38400, 57600, 74800, 115200, 230400, 460800, 921600, 1843200, 3686400
+#if 0
+const menuitem_t menu_serial_speed2[] = {
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 460800), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 921600), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING(1843200), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING(3686400), "%u", menu_serial_speed_acb },
+  { MT_CANCEL, 0, S_LARROW" BACK", NULL },
+  { MT_NONE, 0, NULL, NULL } // sentinel
+};
+#endif
+
+const menuitem_t menu_serial_speed[] = {
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 19200), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 38400), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 57600), "%u", menu_serial_speed_acb },
+//  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 76800), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING(115200), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING(230400), "%u", menu_serial_speed_acb },
+//  { MT_SUBMENU, 0, S_RARROW" MORE", menu_serial_speed2 },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 460800), "%u", menu_serial_speed_acb },
+  { MT_ADV_CALLBACK, USART_SPEED_SETTING( 921600), "%u", menu_serial_speed_acb },
+  { MT_CANCEL, 0, S_LARROW" BACK", NULL },
+  { MT_NONE, 0, NULL, NULL } // sentinel
+};
+
+const menuitem_t menu_connection[] = {
+  { MT_ADV_CALLBACK, _MODE_USB,    "USB",    menu_connection_acb },
+  { MT_ADV_CALLBACK, _MODE_SERIAL, "SERIAL", menu_connection_acb },
+  { MT_SUBMENU,  0, "SERIAL\nSPEED", menu_serial_speed },
+  { MT_CANCEL, 0, S_LARROW" BACK", NULL },
+  { MT_NONE, 0, NULL, NULL } // sentinel
+};
+#endif
+
+const menuitem_t menu_touch[] = {
+  { MT_CALLBACK, CONFIG_MENUITEM_TOUCH_CAL,  "TOUCH CAL",  menu_config_cb},
+  { MT_CALLBACK, CONFIG_MENUITEM_TOUCH_TEST, "TOUCH TEST", menu_config_cb},
+  { MT_CANCEL, 0, S_LARROW" BACK", NULL },
+  { MT_NONE, 0, NULL, NULL } // sentinel
+};
+
 static const menuitem_t menu_config[] = {
-  { MT_CALLBACK, 0, "TOUCH CAL",      menu_config_cb},
-  { MT_CALLBACK, 0, "TOUCH TEST",     menu_config_cb},
-  { MT_CALLBACK, 0, "SELF TEST",      menu_config_cb},
-  { MT_SUBMENU,  0, "LEVEL CAL",      menu_calibrate},
-  { MT_CALLBACK, 0, "VERSION",        menu_config_cb},
+  { MT_SUBMENU,  0,                        "TOUCH",     menu_touch},
+  { MT_CALLBACK, CONFIG_MENUITEM_SELFTEST, "SELF TEST", menu_config_cb},
+  { MT_SUBMENU,  0,                        "LEVEL CAL", menu_calibrate},
+  { MT_CALLBACK, CONFIG_MENUITEM_VERSION,  "VERSION",   menu_config_cb},
+#ifdef __USE_SERIAL_CONSOLE__
+  { MT_SUBMENU,  0, "CONNECTION", menu_connection},
+#endif
   { MT_SUBMENU,  0, "EXPERT\nCONFIG", menu_settings},
   { MT_SUBMENU,  0, S_RARROW" DFU",  menu_dfu},
   { MT_CANCEL,   0, S_LARROW" BACK", NULL },
