@@ -492,6 +492,7 @@ extern int in_selftest;
 #define USART_GET_SPEED(idx)           (((idx) + 1) * USART_SPEED_MULTIPLIER)
 void shell_update_speed(void);
 void shell_reset_console(void);
+int  shell_serial_printf(const char *fmt, ...)
 
 #ifdef __VNA
 void set_electrical_delay(float picoseconds);
