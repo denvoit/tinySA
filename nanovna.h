@@ -39,7 +39,7 @@
 //#define __ULTRA__             // Add harmonics mode on low input.
 //#define __ULTRA_SA__            // Adds ADF4351 control for extra high 1st IF stage
 #define __SPUR__                // Does spur reduction by shifting IF
-
+#define __USE_SERIAL_CONSOLE__  // Enable serial I/O connection (need enable HAL_USE_SERIAL as TRUE in halconf.h)
 /*
  * main.c
  */
@@ -437,6 +437,11 @@ typedef struct trace {
 #define FREQ_MODE_CENTER_SPAN   0x1
 #define FREQ_MODE_DOTTED_GRID   0x2
 
+// Connection flag
+#define _MODE_CONNECTION_MASK  0x04
+#define _MODE_SERIAL           0x04
+#define _MODE_USB              0x00
+
 typedef struct config {
   int32_t magic;
   uint16_t dac_value;
@@ -445,7 +450,8 @@ typedef struct config {
   uint16_t menu_active_color;
   uint16_t trace_color[TRACES_MAX];
   int16_t  touch_cal[4];
-  int8_t   freq_mode;
+  uint8_t  _mode;
+  uint32_t _serial_speed;
 #ifdef __VNA__
   uint32_t harmonic_freq_threshold;
 #endif
@@ -474,6 +480,18 @@ float get_trace_scale(int t);
 float get_trace_refpos(int t);
 const char *get_trace_typename(int t);
 extern int in_selftest;
+
+//
+// Shell config functions and macros
+// Serial connect definitions not used if Serial mode disabled
+// Minimum speed - USART_SPEED_MULTIPLIER
+// Maximum speed - USART_SPEED_MULTIPLIER * 256
+// Can be: 19200, 38400, 57600, 76800, 115200, 230400, 460800, 921600, 1843200, 3686400
+#define USART_SPEED_MULTIPLIER          19200
+#define USART_SPEED_SETTING(speed)     ((speed)/USART_SPEED_MULTIPLIER - 1)
+#define USART_GET_SPEED(idx)           (((idx) + 1) * USART_SPEED_MULTIPLIER)
+void shell_update_speed(void);
+void shell_reset_console(void);
 
 #ifdef __VNA
 void set_electrical_delay(float picoseconds);

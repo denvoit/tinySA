@@ -50,7 +50,7 @@ int32_t frequencyExtra;
 // enable this need reduce spi_buffer size, by default shell run in main thread
 // #define VNA_SHELL_THREAD
 
-static BaseSequentialStream *shell_stream = (BaseSequentialStream *)&SDU1;
+static BaseSequentialStream *shell_stream;
 
 // Shell new line
 #define VNA_SHELL_NEWLINE_STR    "\r\n"
@@ -83,6 +83,9 @@ static volatile vna_shellcmd_t  shell_function = 0;
 #define ENABLE_INFO_COMMAND
 // Enable color command, allow change config color for traces, grid, menu
 #define ENABLE_COLOR_COMMAND
+// Enable transform command
+#define ENABLE_USART_COMMAND
+
 #ifdef __VNA__
 static void apply_error_term_at(int i);
 static void apply_edelay_at(int i);
@@ -857,7 +860,8 @@ config_t config = {
   .trace_color =       { DEFAULT_TRACE_1_COLOR, DEFAULT_TRACE_2_COLOR, DEFAULT_TRACE_3_COLOR},
 //  .touch_cal =         { 693, 605, 124, 171 },  // 2.4 inch LCD panel
   .touch_cal =         { 347, 495, 160, 205 },  // 2.8 inch LCD panel
-  .freq_mode = FREQ_MODE_START_STOP,
+  ._mode     = _MODE_USB,
+  ._serial_speed = USART_SPEED_SETTING(SERIAL_DEFAULT_BITRATE),
 #ifdef __VNA__
   .harmonic_freq_threshold = 300000000,
 #endif
@@ -2283,6 +2287,21 @@ VNA_SHELL_FUNCTION(cmd_threads)
 }
 #endif
 
+#ifdef ENABLE_USART_COMMAND
+VNA_SHELL_FUNCTION(cmd_usart)
+{
+  uint32_t time = 2000; // 200ms wait answer by default
+  if (argc == 0 || argc > 2 || (config._mode & _MODE_SERIAL)) return;
+  if (argc == 2) time = my_atoui(argv[1])*10;
+  sdWriteTimeout(&SD1, (uint8_t *)argv[0], strlen(argv[0]), time);
+  sdWriteTimeout(&SD1, (uint8_t *)VNA_SHELL_NEWLINE_STR, sizeof(VNA_SHELL_NEWLINE_STR)-1, time);
+  uint32_t size;
+  uint8_t buffer[64];
+  while ((size = sdReadTimeout(&SD1, buffer, sizeof(buffer), time)))
+    streamWrite(&SDU1, buffer, size);
+}
+#endif
+
 #include "sa_cmd.c"
 
 //=============================================================================
@@ -2342,6 +2361,9 @@ static const VNAShellCommand commands[] =
     {"trace"       , cmd_trace       , CMD_WAIT_MUTEX},
     {"trigger"     , cmd_trigger     , 0},
     {"marker"      , cmd_marker      , 0},
+#ifdef ENABLE_USART_COMMAND
+    {"usart"       , cmd_usart       , CMD_WAIT_MUTEX},
+#endif
 #ifdef __VNA__
     {"edelay"      , cmd_edelay      , 0},
 #endif
@@ -2417,6 +2439,112 @@ VNA_SHELL_FUNCTION(cmd_help)
 /*
  * VNA shell functions
  */
+// Check Serial connection requirements
+#ifdef __USE_SERIAL_CONSOLE__
+#if HAL_USE_SERIAL == FALSE
+#error "For serial console need HAL_USE_SERIAL as TRUE in halconf.h"
+#endif
+
+// Before start process command from shell, need select input stream
+#define PREPARE_STREAM shell_stream = (config._mode&_MODE_SERIAL) ? (BaseSequentialStream *)&SD1 : (BaseSequentialStream *)&SDU1;
+
+// Update Serial connection speed and settings
+void shell_update_speed(void){
+  // Update Serial speed settings
+  SerialConfig s_config = {USART_GET_SPEED(config._serial_speed), 0, USART_CR2_STOP1_BITS, 0 };
+  sdStop(&SD1);
+  sdStart(&SD1, &s_config);  // USART config
+}
+
+// Check USB connection status
+static bool usb_IsActive(void){
+  return usbGetDriverStateI(&USBD1) == USB_ACTIVE;
+}
+
+// Reset shell I/O queue
+void shell_reset_console(void){
+  // Reset I/O queue over USB (for USB need also connect/disconnect)
+  if (usb_IsActive()){
+    if (config._mode & _MODE_SERIAL)
+      sduDisconnectI(&SDU1);
+    else
+      sduConfigureHookI(&SDU1);
+  }
+  // Reset I/O queue over Serial
+  oqResetI(&SD1.oqueue);
+  iqResetI(&SD1.iqueue);
+}
+
+// Check active connection for Shell
+static bool shell_check_connect(void){
+  // Serial connection always active
+  if (config._mode & _MODE_SERIAL)
+    return true;
+  // USB connection can be USB_SUSPENDED
+  return usb_IsActive();
+}
+
+static void shell_init_connection(void){
+/*
+ * Initializes and start serial-over-USB CDC driver SDU1, connected to USBD1
+ */
+  sduObjectInit(&SDU1);
+  sduStart(&SDU1, &serusbcfg);
+
+/*
+ * Set Serial speed settings for SD1
+ */
+  shell_update_speed();
+
+/*
+ * Activates the USB driver and then the USB bus pull-up on D+.
+ * Note, a delay is inserted in order to not have to disconnect the cable
+ * after a reset.
+ */
+  usbDisconnectBus(&USBD1);
+  chThdSleepMilliseconds(100);
+  usbStart(&USBD1, &usbcfg);
+  usbConnectBus(&USBD1);
+
+/*
+ *  Set I/O stream (SDU1 or SD1) for shell
+ */
+  PREPARE_STREAM;
+}
+
+#else
+// Only USB console, shell_stream always on USB
+#define PREPARE_STREAM
+
+// Check connection as Active, if no suspend input
+static bool shell_check_connect(void){
+  return SDU1.config->usbp->state == USB_ACTIVE;
+}
+
+// Init shell I/O connection over USB
+static void shell_init_connection(void){
+/*
+ * Initializes and start serial-over-USB CDC driver SDU1, connected to USBD1
+ */
+  sduObjectInit(&SDU1);
+  sduStart(&SDU1, &serusbcfg);
+
+/*
+ * Activates the USB driver and then the USB bus pull-up on D+.
+ * Note, a delay is inserted in order to not have to disconnect the cable
+ * after a reset.
+ */
+  usbDisconnectBus(&USBD1);
+  chThdSleepMilliseconds(100);
+  usbStart(&USBD1, &usbcfg);
+  usbConnectBus(&USBD1);
+
+/*
+ *  Set I/O stream SDU1 for shell
+ */
+  shell_stream = (BaseSequentialStream *)&SDU1;
+}
+#endif
 
 //
 // Read command line from shell_stream
@@ -2426,6 +2554,8 @@ static int VNAShell_readLine(char *line, int max_size)
   // Read line from input stream
   uint8_t c;
   char *ptr = line;
+  // Prepare I/O for shell_stream
+  PREPARE_STREAM;
   while (1) {
     // Return 0 only if stream not active
     if (streamRead(shell_stream, &c, 1) == 0)
@@ -2647,23 +2777,6 @@ int main(void)
   si5351_init();
 #endif
 
-  // MCO on PA8
-  //palSetPadMode(GPIOA, 8, PAL_MODE_ALTERNATE(0));
-/*
- * Initializes a serial-over-USB CDC driver.
- */
-  sduObjectInit(&SDU1);
-  sduStart(&SDU1, &serusbcfg);
-/*
- * Activates the USB driver and then the USB bus pull-up on D+.
- * Note, a delay is inserted in order to not have to disconnect the cable
- * after a reset.
- */
-  usbDisconnectBus(serusbcfg.usbp);
-  chThdSleepMilliseconds(100);
-  usbStart(serusbcfg.usbp, &usbcfg);
-  usbConnectBus(serusbcfg.usbp);
-
 #ifdef __SI4432__
  /*
   * Powercycle the RF part to reset SI4432
@@ -2703,44 +2816,6 @@ int main(void)
   }
 #endif
 
-
-#if 0
- /*
-  * UART initialize
-  */
-  uartStart(&UARTD1, &uart_cfg_1);
-again:
-  uartStartSend(&UARTD1, 1, "H");
-  uint8_t buf[10];
-  uartStartReceive(&UARTD1, 1, buf);
-goto again;
-#endif
-
-#if 0
-  again:
-
-  palSetPadMode(GPIOA, 9, PAL_MODE_ALTERNATE(1));  // USART1 TX.
-  palSetPadMode(GPIOA,10, PAL_MODE_ALTERNATE(1)); // USART1 RX.
-
-
-  uint8_t buf[10];
-  sdStart(&SD1,&default_config);
-  osalThreadSleepMilliseconds(10);
-  mySerialWrite("Hallo!?\n");
-
-  osalThreadSleepMilliseconds(10);
-
-  mySerialReadline(buf, 10);
-
-  sdReadTimeout(&SD1,buf,10, 10);
-
-  sdWrite(&SD1,(const uint8_t *)"Test123",7);
-  osalThreadSleepMicroseconds(10);
-  sdReadTimeout(&SD1,buf,10,TIME_IMMEDIATE);
-  sdReadTimeout(&SD1,buf,10, 10);
-  int i = sdReadTimeout(&SD1,buf,10,TIME_IMMEDIATE);
-goto again;
-#endif
 #ifdef __ULTRA_SA__
   ADF4351_Setup();
 #endif
@@ -2760,6 +2835,12 @@ goto again;
   if (caldata_recall(0) == -1) {
     load_default_properties();
   }
+
+/*
+ * Init Shell console connection data (after load config for settings)
+ */
+  shell_init_connection();
+
 /* restore frequencies and calibration 0 slot properties from flash memory */
 #ifdef __VNA__
   dac1cfg1.init = config.dac_value;
