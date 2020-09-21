@@ -1908,16 +1908,23 @@ VNA_SHELL_FUNCTION(cmd_marker)
   if (t < 0 || t >= MARKERS_MAX)
     goto usage;
   if (argc == 1) {
+  display_marker:
     shell_printf("%d %d %d %.2f\r\n", t+1, markers[t].index, markers[t].frequency, value(actual_t[markers[t].index]));
     active_marker = t;
     // select active marker
     markers[t].enabled = TRUE;
     return;
   }
-  static const char cmd_marker_list[] = "on|off";
+  static const char cmd_marker_list[] = "on|off|peak";
   switch (get_str_index(argv[1], cmd_marker_list)) {
     case 0: markers[t].enabled = TRUE; active_marker = t; return;
     case 1: markers[t].enabled =FALSE; if (active_marker == t) active_marker = -1; return;
+    case 2: markers[t].enabled = TRUE; active_marker = t;
+      int i = marker_search_max();
+      if (i == -1) i = 0;
+      markers[active_marker].index = i;
+      markers[active_marker].frequency = frequencies[i];
+      goto display_marker;
     default:
       // select active marker and move to index
       markers[t].enabled = TRUE;
@@ -2342,6 +2349,7 @@ static const VNAShellCommand commands[] =
     {"touchtest"   , cmd_touchtest   , CMD_WAIT_MUTEX},
     {"pause"       , cmd_pause       , 0},
     {"resume"      , cmd_resume      , 0},
+    {"caloutput"   , cmd_caloutput   , 0},
 #ifdef __VNA__
     {"cal"         , cmd_cal         , CMD_WAIT_MUTEX},
 #endif

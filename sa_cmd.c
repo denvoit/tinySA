@@ -608,6 +608,20 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
   redraw_request = 0; // disable screen update in this mode
 }
 
+VNA_SHELL_FUNCTION(cmd_caloutput)
+{
+  static const char cmd[] = "off|30|15|10|4|3|2|1";
+  if (argc != 1) {
+  usage:
+    shell_printf("usage: caloutput %s\r\n", cmd);
+    return;
+  }
+  int m = get_str_index(argv[0], cmd);
+  if (m != -1)
+    set_refer_output(m - 1);
+}
+
+
 #pragma GCC pop_options
 
 
