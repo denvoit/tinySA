@@ -494,6 +494,7 @@ void shell_update_speed(void);
 void shell_reset_console(void);
 int  shell_serial_printf(const char *fmt, ...);
 
+
 #ifdef __VNA
 void set_electrical_delay(float picoseconds);
 float get_electrical_delay(void);
