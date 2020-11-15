@@ -22,29 +22,12 @@
 #include "nanovna.h"
 #include <string.h>
 
-static int flash_wait_for_last_operation(void)
+static void flash_wait_for_last_operation(void)
 {
   while (FLASH->SR == FLASH_SR_BSY) {
     //WWDG->CR = WWDG_CR_T;
   }
-  return FLASH->SR;
-}
-
-static void flash_erase_page0(uint32_t page_address)
-{
-  flash_wait_for_last_operation();
-  FLASH->CR |= FLASH_CR_PER;
-  FLASH->AR = page_address;
-  FLASH->CR |= FLASH_CR_STRT;
-  flash_wait_for_last_operation();
-  FLASH->CR &= ~FLASH_CR_PER;
-}
-
-static void flash_erase_page(uint32_t page_address)
-{
-  chSysLock();
-  flash_erase_page0(page_address);
-  chSysUnlock();
+//  return FLASH->SR;
 }
 
 static inline void flash_unlock(void)
@@ -54,13 +37,34 @@ static inline void flash_unlock(void)
   FLASH->KEYR = 0xCDEF89AB;
 }
 
+static inline void flash_erase_page0(uint32_t page_address)
+{
+  flash_wait_for_last_operation();
+  FLASH->CR |= FLASH_CR_PER;
+  FLASH->AR = page_address;
+  FLASH->CR |= FLASH_CR_STRT;
+  flash_wait_for_last_operation();
+  FLASH->CR &= ~FLASH_CR_PER;
+}
+
+static void flash_erase_pages(uint32_t page_address, uint32_t size)
+{
+  // Unlock for erase
+  flash_unlock();
+
+  chSysLock();
+  // erase flash pages
+  size+=page_address;
+  for (; page_address < size; page_address+=FLASH_PAGESIZE)
+    flash_erase_page0(page_address);
+  chSysUnlock();
+}
+
 static void flash_program_half_word_buffer(uint16_t* dst, uint16_t *data, uint16_t size)
 {
   uint32_t i;
-  flash_unlock();
-  // erase flash pages for buffer (aligned to FLASH_PAGESIZE)
-  for (i = 0; i < size; i+=FLASH_PAGESIZE)
-    flash_erase_page((uint32_t)dst + i);
+  // unlock, and erase flash pages for buffer (aligned to FLASH_PAGESIZE)
+  flash_erase_pages((uint32_t)dst, size);
   // Save buffer
   __IO uint16_t* p = dst;
   for (i = 0; i < size/sizeof(uint16_t); i++){
@@ -153,11 +157,7 @@ caldata_recall(uint16_t id)
 void
 clear_all_config_prop_data(void)
 {
-  uint32_t i;
-  flash_unlock();
-
-  // erase flash pages
-  for (i = 0; i < SAVE_CONFIG_AREA_SIZE; i+=FLASH_PAGESIZE)
-    flash_erase_page(SAVE_CONFIG_ADDR + i);
+  // unlock and erase flash pages
+  flash_erase_pages(SAVE_CONFIG_ADDR, SAVE_CONFIG_AREA_SIZE);
 }
 
