@@ -40,28 +40,36 @@ static void flash_erase_page0(uint32_t page_address)
   FLASH->CR &= ~FLASH_CR_PER;
 }
 
-int flash_erase_page(uint32_t page_address)
+static void flash_erase_page(uint32_t page_address)
 {
   chSysLock();
   flash_erase_page0(page_address);
   chSysUnlock();
-  return 0;
 }
 
-void flash_program_half_word(uint32_t address, uint16_t data)
-{
-  flash_wait_for_last_operation();
-  FLASH->CR |= FLASH_CR_PG;
-  *(__IO uint16_t*)address = data;
-  flash_wait_for_last_operation();
-  FLASH->CR &= ~FLASH_CR_PG;
-}
-
-void flash_unlock(void)
+static inline void flash_unlock(void)
 {
   // unlock sequence
   FLASH->KEYR = 0x45670123;
   FLASH->KEYR = 0xCDEF89AB;
+}
+
+static void flash_program_half_word_buffer(uint16_t* dst, uint16_t *data, uint16_t size)
+{
+  uint32_t i;
+  flash_unlock();
+  // erase flash pages for buffer (aligned to FLASH_PAGESIZE)
+  for (i = 0; i < size; i+=FLASH_PAGESIZE)
+    flash_erase_page((uint32_t)dst + i);
+  // Save buffer
+  __IO uint16_t* p = dst;
+  for (i = 0; i < size/sizeof(uint16_t); i++){
+    flash_wait_for_last_operation();
+    FLASH->CR |= FLASH_CR_PG;
+    p[i] = data[i];
+    flash_wait_for_last_operation();
+    FLASH->CR &= ~FLASH_CR_PG;
+  }
 }
 
 static uint32_t
@@ -78,24 +86,11 @@ checksum(const void *start, size_t len)
 int
 config_save(void)
 {
-  uint16_t *src = (uint16_t*)&config;
-  uint16_t *dst = (uint16_t*)SAVE_CONFIG_ADDR;
-  int count = sizeof(config_t) / sizeof(uint16_t);
-
   config.magic = CONFIG_MAGIC;
   config.checksum = checksum(&config, sizeof config - sizeof config.checksum);
 
-  flash_unlock();
-
-  /* erase flash pages */
-  flash_erase_page((uint32_t)dst);
-
-  /* write to flash */
-  while (count-- > 0) {
-    flash_program_half_word((uint32_t)dst, *src++);
-    dst++;
-  }
-
+  // write to flash
+  flash_program_half_word_buffer((uint16_t*)SAVE_CONFIG_ADDR, (uint16_t*)&config, sizeof(config_t));
   return 0;
 }
 
@@ -105,60 +100,26 @@ config_recall(void)
   const config_t *src = (const config_t*)SAVE_CONFIG_ADDR;
   void *dst = &config;
 
-  if (src->magic != CONFIG_MAGIC)
-    return -1;
-  if (checksum(src, sizeof *src - sizeof src->checksum) != src->checksum)
+  if (src->magic != CONFIG_MAGIC || checksum(src, sizeof *src - sizeof src->checksum) != src->checksum)
     return -1;
 
-  /* duplicated saved data onto sram to be able to modify marker/trace */
+  // duplicated saved data onto sram to be able to modify marker/trace
   memcpy(dst, src, sizeof(config_t));
   return 0;
 }
-
-
-//int16_t lastsaveid = 0;
 
 int
 caldata_save(uint16_t id)
 {
   if (id >= SAVEAREA_MAX)
     return -1;
-  uint16_t *src = (uint16_t*)&setting;
-  uint16_t *dst;
-  int count = sizeof(setting_t) / sizeof(uint16_t);
 
-  dst = (uint16_t*)(SAVE_PROP_CONFIG_ADDR + id * SAVE_PROP_CONFIG_SIZE);
-
+  // Apply magic word and calculate checksum
   setting.magic = CONFIG_MAGIC;
-  setting.checksum = checksum(
-      &setting, sizeof setting - sizeof setting.checksum);
+  setting.checksum = checksum(&setting, sizeof setting - sizeof setting.checksum);
 
-  flash_unlock();
-
-  /* erase flash pages */
-  void *p = dst;
-  void *tail = p + sizeof(setting_t);
-  while (p < tail) {
-    flash_erase_page((uint32_t)p);
-    p += FLASH_PAGESIZE;
-  }
-
-  /* write settings to flash */
-  while (count-- > 0) {
-    flash_program_half_word((uint32_t)dst, *src++);
-    dst++;
-  }
-  // Flash stored trace to flash
-  count = sizeof(stored_t) /  sizeof(uint16_t);
-  src = (uint16_t*)&stored_t[0];
-  while (count-- > 0) {
-    flash_program_half_word((uint32_t)dst, *src++);
-    dst++;
-  }
-
-  /* after saving data, make active configuration points to flash */
-//  active_props = (setting_t*)saveareas[id];
-//  lastsaveid = id;
+  uint16_t *dst = (uint16_t*)(SAVE_PROP_CONFIG_ADDR + id * SAVE_PROP_CONFIG_SIZE);
+  flash_program_half_word_buffer(dst, (uint16_t*)&setting, sizeof(setting));
 
   return 0;
 }
@@ -175,16 +136,10 @@ caldata_recall(uint16_t id)
   // point to saved area on the flash memory
   src = (setting_t*)(SAVE_PROP_CONFIG_ADDR + id * SAVE_PROP_CONFIG_SIZE);
 
-  if (src->magic != CONFIG_MAGIC)
-    return -1;
-  if (checksum(src, sizeof setting - sizeof src->checksum) != src->checksum)
+  if (src->magic != CONFIG_MAGIC || checksum(src, sizeof setting - sizeof src->checksum) != src->checksum)
     return -1;
 
-  /* active configuration points to save data on flash memory */
-//  active_props = src;
-//  lastsaveid = id;
-
-  /* duplicated saved data onto sram to be able to modify marker/trace */
+  // duplicated saved data onto sram to be able to modify marker/trace
   memcpy(dst, src, sizeof(setting_t));
   // Restore stored trace
   memcpy(stored_t, &src[1], sizeof(stored_t));
@@ -194,34 +149,15 @@ caldata_recall(uint16_t id)
   set_reflevel(setting.reflevel);
   return 0;
 }
-#if 0
-const setting_t *
-caldata_ref(int id)
-{
-  const setting_t *src;
-  if (id < 0 || id >= SAVEAREA_MAX)
-    return NULL;
-  src = (const setting_t*)saveareas[id];
-
-  if (src->magic != CONFIG_MAGIC)
-    return NULL;
-  if (checksum(src, sizeof *src - sizeof src->checksum) != src->checksum)
-    return NULL;
-  return src;
-}
-#endif
 
 void
 clear_all_config_prop_data(void)
 {
+  uint32_t i;
   flash_unlock();
 
-  /* erase flash pages */
-  void *p = (void*)SAVE_CONFIG_ADDR;
-  void *tail = p + SAVE_CONFIG_AREA_SIZE;
-  while (p < tail) {
-    flash_erase_page((uint32_t)p);
-    p += FLASH_PAGESIZE;
-  }
+  // erase flash pages
+  for (i = 0; i < SAVE_CONFIG_AREA_SIZE; i+=FLASH_PAGESIZE)
+    flash_erase_page(SAVE_CONFIG_ADDR + i);
 }
 
