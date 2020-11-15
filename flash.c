@@ -22,7 +22,7 @@
 #include "nanovna.h"
 #include <string.h>
 
-static void flash_wait_for_last_operation(void)
+static inline void flash_wait_for_last_operation(void)
 {
   while (FLASH->SR == FLASH_SR_BSY) {
     //WWDG->CR = WWDG_CR_T;
