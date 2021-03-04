@@ -7,7 +7,7 @@
 ifeq ($(TARGET),)
   TARGET = F072
 else
-  TARGET=F303
+  TARGET = F303
 endif
 
 # Compiler options here.

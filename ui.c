@@ -26,7 +26,7 @@
 #include <math.h>
 
 #pragma GCC push_options
-#pragma GCC optimize ("Og")
+#pragma GCC optimize ("Os")
 
 uistat_t uistat = {
  digit: 6,
@@ -2028,7 +2028,7 @@ menu_select_touch(int i, int pos)
         if (touch_x !=  prev_touch_x /* - 1 || prev_touch_x + 1 < touch_x */ ) {
         keypad_mode = keypad;
         fetch_numeric_target();
-        volatile int new_slider = (int)touch_x - LCD_WIDTH/2;   // Can have negative outcome
+        int new_slider = touch_x - LCD_WIDTH/2;   // Can have negative outcome
         if (new_slider < - (MENU_FORM_WIDTH-8)/2)
           new_slider = -(MENU_FORM_WIDTH-8)/2;
         if (new_slider > (MENU_FORM_WIDTH-8)/2)
@@ -2044,9 +2044,7 @@ menu_select_touch(int i, int pos)
             }
           }
           if (mode == SL_MOVE ) {
-              uistat.value =  uistat.value - setting.slider_position * ((int)setting.slider_span/(MENU_FORM_WIDTH-8)) + new_slider * ((int)setting.slider_span/(MENU_FORM_WIDTH-8));
-              if (uistat.value < 0)
-                uistat.value = 0;
+              uistat.value =  uistat.value - setting.slider_position * (setting.slider_span/(MENU_FORM_WIDTH-8)) + new_slider * (setting.slider_span/(MENU_FORM_WIDTH-8));
               if (uistat.value < minFreq)
                 uistat.value = minFreq;
               if (uistat.value > maxFreq)
@@ -2125,7 +2123,6 @@ menu_select_touch(int i, int pos)
     if (dt > BUTTON_DOWN_LONG_TICKS || do_exit) {
       selection = -1;
       draw_menu();
-      redraw_request = 0;       // Remove request to redraw grid
       return;
     }
     if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_LOWOUTLEVEL) {
@@ -2151,10 +2148,10 @@ menu_select_touch(int i, int pos)
     } else if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_CENTER) {
       switch (pos) {
       case 0:
-        step = -(int)setting.slider_span;
+        step = -setting.slider_span;
         break;
       case 1:
-        step = -(int)setting.slider_span/10;
+        step = -setting.slider_span/10;
         break;
       case 2:
         goto nogo;
@@ -2761,8 +2758,7 @@ ui_process_keypad(void)
     ui_mode_menu(); //Reactivate menu after keypad
     selection = -1;
     ensure_selection();
- //   redraw_request = 0;       // Clear all draw requests
-    redraw_request = REDRAW_BATTERY;    // Only redraw battery
+    redraw_request|= REDRAW_BATTERY;    // Only redraw battery
   } else {
     ui_mode_normal();
 //  request_to_redraw_grid();
