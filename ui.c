@@ -2372,26 +2372,24 @@ lever_move_marker(int status)
 {
   uint16_t step = 1<<2;
   do {
-    if (active_marker >= 0 && markers[active_marker].enabled) {
+    if (active_marker != MARKER_INVALID && markers[active_marker].enabled) {
+      int idx = (int)markers[active_marker].index;
       if (status & EVT_DOWN) {
-        markers[active_marker].index -= step>>2;
-        if (markers[active_marker].index < 0)
-          markers[active_marker].index = 0 ;
+        idx -= step>>2;
+        if (idx < 0) idx = 0 ;
       }
       if (status & EVT_UP) {
-        markers[active_marker].index += step>>2;
-        if (markers[active_marker].index  > sweep_points-1)
-          markers[active_marker].index = sweep_points-1 ;
+        idx += step>>2;
+        if (idx  > sweep_points-1) idx = sweep_points-1 ;
       }
-      markers[active_marker].frequency = frequencies[markers[active_marker].index];
+      markers[active_marker].index = idx;
+      markers[active_marker].frequency = frequencies[idx];
       redraw_marker(active_marker);
       markers[active_marker].mtype &= ~M_TRACKING;    // Disable tracking when dragging marker
       step++;
     }
     status = btn_wait_release();
   } while (status != 0);
-  if (active_marker != MARKER_INVALID)
-    redraw_marker(active_marker);
 }
 
 static void

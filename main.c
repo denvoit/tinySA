@@ -1180,35 +1180,36 @@ VNA_SHELL_FUNCTION(cmd_scan)
 static void
 update_marker_index(void)
 {
-  int m;
-  int i;
+  int m, idx;
+  freq_t fstart = get_sweep_frequency(ST_START);
+  freq_t fstop  = get_sweep_frequency(ST_STOP);
   for (m = 0; m < MARKERS_MAX; m++) {
     if (!markers[m].enabled)
       continue;
     freq_t f = markers[m].frequency;
-    freq_t fstart = get_sweep_frequency(ST_START);
-    freq_t fstop  = get_sweep_frequency(ST_STOP);
-    if (f < fstart) {
-      markers[m].index = 0;
-      markers[m].frequency = fstart;
-    } else if (f >= fstop) {
-      markers[m].index = sweep_points-1;
-      markers[m].frequency = fstop;
-    } else {
-      for (i = 0; i < sweep_points-1; i++) {
-        if (frequencies[i] <= f && f < frequencies[i+1]) {
-          markers[m].index = f < (frequencies[i] / 2 + frequencies[i + 1] / 2) ? i : i + 1;
-          markers[m].frequency = frequencies[markers[m].index ];
-          break;
-        }
-      }      
+    if (f == 0) idx = markers[m].index; // Not need update index in no freq
+    else if (f < fstart) idx = 0;
+    else if (f >= fstop) idx = sweep_points-1;
+    else { // Search frequency index for marker frequency
+#if 1
+      for (idx = 1; idx < sweep_points; idx++) {
+        if (frequencies[idx] <= f) continue;
+        if (f < (frequencies[idx-1]/2 + frequencies[idx]/2)) idx--; // Correct closest idx
+        break;
+      }
+#else
+      float r = ((float)(f - fstart))/(fstop - fstart);
+      idx = r * (sweep_points-1);
+#endif
     }
+    markers[m].index = idx;
+    markers[m].frequency = frequencies[idx];
   }
 }
 
 void set_marker_frequency(int m, freq_t f)
 {
-  if (m < 0 || !markers[m].enabled)
+  if (m == MARKER_INVALID || !markers[m].enabled)
     return;
   int i = 1;
   markers[m].mtype &= ~M_TRACKING;
