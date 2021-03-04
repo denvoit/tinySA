@@ -897,24 +897,23 @@ VNA_SHELL_FUNCTION(cmd_capture)
 
 void send_region(const char *t, int x, int y, int w, int h)
 {
-  shell_printf("%s\r\n", t);
-  streamPut(shell_stream, (((uint16_t) x) & 0xff));
-  streamPut(shell_stream, (((uint16_t)x>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) y) & 0xff));
-  streamPut(shell_stream, (((uint16_t)y>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) w) & 0xff));
-  streamPut(shell_stream, (((uint16_t)w>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) h) & 0xff));
-  streamPut(shell_stream, (((uint16_t)h>>8) & 0xff));
+  shell_printf(t);
+  struct {
+    char new_str[2];
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+  } region={"\r\n", x,y,w,h};
+  streamWrite(shell_stream, (char*)&region, sizeof(region));
 }
 
 void send_buffer(uint8_t * buf, int s)
 {
-  for (int i = 0; i < s; i++) {
-    streamPut(shell_stream, *buf++);
-  }
-  shell_printf("ch> \r\n");
+  streamWrite(shell_stream, buf, s);
+  streamWrite(shell_stream, "ch> \r\n", 6);
 }
+
 #if 0
 VNA_SHELL_FUNCTION(cmd_gamma)
 {
