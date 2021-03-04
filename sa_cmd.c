@@ -250,10 +250,12 @@ VNA_SHELL_FUNCTION(cmd_levelchange)
 VNA_SHELL_FUNCTION(cmd_leveloffset)
 {
   if (argc == 0) {
-    shell_printf("leveloffset low %.1f\r\n", config.low_level_offset);
-    shell_printf("leveloffset high %.1f\r\n", config.high_level_offset);
-    shell_printf("leveloffset low output %.1f\r\n", config.low_level_output_offset);
-    shell_printf("leveloffset high output %.1f\r\n", config.high_level_output_offset);
+    const char *p = "leveloffset %s %.1f\r\n";
+    shell_printf(p, "low",          config.low_level_offset);
+    shell_printf(p, "high",         config.high_level_offset);
+    shell_printf(p, "low output",   config.low_level_output_offset);
+    shell_printf(p, "high output",  config.high_level_output_offset);
+    shell_printf(p, "switch",       config.switch_offset);
     return;
   } else if (argc == 2) {
     float v = my_atof(argv[1]);
@@ -261,6 +263,8 @@ VNA_SHELL_FUNCTION(cmd_leveloffset)
       config.low_level_offset = v;
     else if (strcmp(argv[0],"high") == 0)
       config.high_level_offset = v;
+    else if (strcmp(argv[0],"switch") == 0)
+      config.switch_offset = v;
     else
       goto usage;
     dirty = true;
@@ -275,7 +279,7 @@ VNA_SHELL_FUNCTION(cmd_leveloffset)
     dirty = true;
   } else {
   usage:
-    shell_printf("leveloffset [low|high] {output} [<offset>]\r\n");
+    shell_printf("leveloffset [low|high|switch] {output} [-20..+20]\r\n");
   }
 }
 

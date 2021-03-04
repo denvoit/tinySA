@@ -1008,6 +1008,7 @@ config_t config = {
   .high_out_adf4350 = true,
 #endif
   .sweep_voltage = 3.3,
+  .switch_offset = 0.0,
 };
 
 //properties_t current_props;

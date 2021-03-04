@@ -428,6 +428,7 @@ enum {
 #ifdef TINYSA4
   KM_LPF,
 #endif
+  // #35
   KM_NONE // always at enum end
 };
 
@@ -472,7 +473,7 @@ static const struct {
 #endif
   {keypads_positive    , "ATTACK"},    // KM_ATTACK
 #ifdef TINYSA4
-  {keypads_freq        , "ULTRA\nSTART"}, // KM_LPF #34
+  {keypads_freq        , "ULTRA\nSTART"}, // KM_LPF
 #endif
 };
 #if 0 // Not used

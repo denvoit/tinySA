@@ -623,6 +623,7 @@ typedef struct config {
   int8_t    cor_nfm;
   uint8_t high_out_adf4350;
   float sweep_voltage;
+  float switch_offset;
   uint32_t    dummy;
 //  uint8_t _reserved[22];
   freq_t checksum;
