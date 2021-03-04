@@ -2374,10 +2374,6 @@ ui_mode_keypad(int _keypad_mode)
   // keypads array
   keypad_mode = _keypad_mode;
   keypads = keypads_mode_tbl[_keypad_mode].keypad_type;
-  int i;
-  for (i = 0; keypads[i+1].c >= 0; i++)
-    ;
-  keypads_last_index = i;
 
   ui_mode = UI_KEYPAD;
   area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
@@ -2386,7 +2382,6 @@ ui_mode_keypad(int _keypad_mode)
     draw_menu();
   draw_keypad();
   draw_numeric_area_frame();
-  draw_numeric_input("");
 }
 
 void
@@ -2727,6 +2722,9 @@ ui_process_keypad(void)
 {
   int status;
   kp_index = 0;
+  int keypads_last_index;
+  for (keypads_last_index = 0; keypads[keypads_last_index+1].c >= 0; keypads_last_index++)
+    ;
   while (TRUE) {
     status = btn_check();
     if (status & (EVT_UP|EVT_DOWN)) {

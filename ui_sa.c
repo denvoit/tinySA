@@ -254,8 +254,6 @@ typedef struct {
 
 static const keypads_t *keypads;
 
-static uint8_t keypads_last_index;
-
 // 7 8 9 G
 // 4 5 6 M
 // 1 2 3 k
