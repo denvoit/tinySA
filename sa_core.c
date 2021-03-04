@@ -44,6 +44,8 @@ uint16_t actual_rbw_x10 = 0;
 uint16_t vbwSteps = 1;
 freq_t minFreq = 0;
 freq_t maxFreq = 520000000;
+static float old_a = -150;          // cached value to reduce writes to level registers
+
 #ifdef TINYSA4
 int spur_gate = 100;
 uint32_t old_CFGR;
@@ -2131,7 +2133,6 @@ static const int fm_modulation_offset[4] =
 
 deviceRSSI_t age[POINTS_COUNT];     // Array used for 1: calculating the age of any max and 2: buffer for fast sweep RSSI values;
 
-static float old_a = -150;          // cached value to reduce writes to level registers
 static pureRSSI_t correct_RSSI;
 static pureRSSI_t correct_RSSI_freq;
 systime_t start_of_sweep_timestamp;
@@ -2196,7 +2197,9 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
     clear_frequency_cache();
 #endif
     calculate_correction();                                                 // pre-calculate correction factor dividers to avoid float division
-    apply_settings();                                                       // Initialize HW
+    apply_settings();
+    old_a = -150;                                                   // clear cached level setting
+    // Initialize HW
     scandirty = true;                                                       // This is the first pass with new settings
     dirty = false;
     sweep_elapsed = chVTGetSystemTimeX();                              // for measuring accumulated time
