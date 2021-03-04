@@ -2124,6 +2124,7 @@ menu_select_touch(int i, int pos)
     if (dt > BUTTON_DOWN_LONG_TICKS || do_exit) {
       selection = -1;
       draw_menu();
+      redraw_request = 0; // reset all (not need update after)
       return;
     }
     if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_LOWOUTLEVEL) {
@@ -2761,7 +2762,7 @@ ui_process_keypad(void)
     ui_mode_menu(); //Reactivate menu after keypad
     selection = -1;
     ensure_selection();
-    redraw_request = REDRAW_BATTERY;    // Only redraw battery
+    redraw_request|= REDRAW_BATTERY;    // Only redraw battery
   } else {
     ui_mode_normal();
 //  request_to_redraw_grid();
