@@ -905,13 +905,13 @@ void send_region(const char *t, int x, int y, int w, int h)
     uint16_t w;
     uint16_t h;
   } region={"\r\n", x,y,w,h};
-  streamWrite(shell_stream, (char*)&region, sizeof(region));
+  streamWrite(shell_stream, (void*)&region, sizeof(region));
 }
 
 void send_buffer(uint8_t * buf, int s)
 {
-  streamWrite(shell_stream, buf, s);
-  streamWrite(shell_stream, "ch> \r\n", 6);
+  streamWrite(shell_stream, (void*) buf, s);
+  streamWrite(shell_stream, (void*)"ch> \r\n", 6);
 }
 
 #if 0
