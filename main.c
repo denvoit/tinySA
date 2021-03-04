@@ -874,7 +874,7 @@ VNA_SHELL_FUNCTION(cmd_capture)
   // read pixel count at one time (PART*2 bytes required for read buffer)
   (void)argc;
   (void)argv;
-  int i, y;
+  int y;
 #ifdef TINYSA4  
 #if SPI_BUFFER_SIZE < (2*LCD_WIDTH)
 #error "Low size of spi_buffer for cmd_capture"
@@ -889,9 +889,7 @@ VNA_SHELL_FUNCTION(cmd_capture)
     // use uint16_t spi_buffer[2048] (defined in ili9341) for read buffer
     uint8_t *buf = (uint8_t *)spi_buffer;
     ili9341_read_memory(0, y, LCD_WIDTH, 2, 2 * LCD_WIDTH, spi_buffer);
-    for (i = 0; i < 4 * LCD_WIDTH; i++) {
-      streamPut(shell_stream, *buf++);
-    }
+    streamWrite(shell_stream, (void*)buf, 2 * 2 * LCD_WIDTH);
   }
 }
 

@@ -896,8 +896,8 @@ typedef struct setting
   int decay;                      // KM_DECAY   < 1000000
   int attack;                     // KM_ATTACK  <   20000
 
-  int32_t  slider_position;
-  int64_t slider_span;
+  int32_t slider_position;
+  freq_t  slider_span;
 
   uint32_t rbw_x10;
   uint32_t vbw_x10;
