@@ -152,8 +152,7 @@ static void leave_ui_mode(void);
 static void erase_menu_buttons(void);
 static void ui_process_keypad(void);
 static void choose_active_marker(void);
-static void menu_move_back(void);
-static void menu_move_back_and_leave_ui(void);
+static void menu_move_back(bool leave_ui);
 static void menu_push_submenu(const menuitem_t *submenu);
 //static const menuitem_t menu_marker_type[];
 
@@ -501,7 +500,7 @@ show_version(void)
     do {shift>>=1; y+=5;} while (shift&1);
     ili9341_drawstring(info_about[i++], x, y+=5);
   }
-  char buf[96];
+  //char buf[96];
 #ifdef TINYSA4
 extern const char *states[];
   #define ENABLE_THREADS_COMMAND
@@ -628,7 +627,7 @@ menu_caldone_cb(int item, uint8_t data)
   (void)data;
   cal_done();
   draw_cal_status();
-  menu_move_back();
+  menu_move_back(false);
   menu_push_submenu(menu_save);
 }
 
@@ -647,7 +646,7 @@ menu_cal2_cb(int item, uint8_t data)
   }
   draw_menu();
   draw_cal_status();
-  //menu_move_back();
+  //menu_move_back(false);
 }
 
 static void
@@ -655,7 +654,7 @@ menu_recall_cb(int item, uint8_t data)
 {
   (void)item;
   caldata_recall(data);
-  menu_move_back();
+  menu_move_back(false);
   ui_mode_normal();
   update_grid();
   draw_cal_status();
@@ -687,7 +686,7 @@ menu_config_save_cb(int item, uint8_t data)
   (void)item;
   (void)data;
   config_save();
-  menu_move_back();
+  menu_move_back(false);
   ui_mode_normal();
 }
 
@@ -704,7 +703,7 @@ menu_save_cb(int item, uint8_t data)
 {
   (void)item;
   if (caldata_save(data) == 0) {
-    menu_move_back();
+    menu_move_back(false);
     ui_mode_normal();
     draw_cal_status();
   }
@@ -760,7 +759,7 @@ menu_channel_cb(int item, uint8_t data)
 {
   (void)item;
   set_trace_channel(uistat.current_trace, data);
-  menu_move_back();
+  menu_move_back(false);
   ui_mode_normal();
 }
 
@@ -863,7 +862,7 @@ menu_stimulus_cb(int item, uint8_t data)
     break;
   case 5: /* PAUSE */
     toggle_sweep();
-    //menu_move_back();
+    //menu_move_back(false);
     //ui_mode_normal();
     draw_menu();
     break;
@@ -938,7 +937,7 @@ static UI_FUNCTION_CALLBACK(menu_marker_op_cb)
     break;
 #endif
   }
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
   redraw_request |= REDRAW_CAL_STATUS;
   //redraw_all();
 }
@@ -1306,7 +1305,7 @@ ensure_selection(void)
 }
 
 static void
-menu_move_back(void)
+menu_move_back(bool leave_ui)
 {
   if (menu_current_level == 0)
     return;
@@ -1316,26 +1315,11 @@ menu_move_back(void)
     selection = 0;
   ensure_selection();
 
-  if (current_menu_is_form()) {
-    redraw_frame();
-    area_width = 0;
-  } else {
-//    redraw_frame();
-    redraw_request |= REDRAW_AREA | REDRAW_FREQUENCY | REDRAW_CAL_STATUS | REDRAW_BATTERY;
-    area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
-  }
-}
-
-static void
-menu_move_back_and_leave_ui(void)
-{
-  if (menu_current_level == 0)
+  if (leave_ui){
+    ui_mode_normal();
     return;
-  menu_current_level--;
-  if (selection >= 0)
-    selection = 0;
-  ensure_selection();
-  ui_mode_normal();
+  }
+  ui_mode_menu();
 }
 
 static void
@@ -1345,21 +1329,7 @@ menu_push_submenu(const menuitem_t *submenu)
   if (menu_current_level < MENU_STACK_DEPTH_MAX-1)
     menu_current_level++;
   menu_stack[menu_current_level] = submenu;
-  if (selection >= 0)
-    selection = 0;
-  ensure_selection();
-  if (menu_is_form(submenu)) {
-    redraw_frame();
-    area_width = 0;
-  } else {
-//    redraw_frame();
-//    request_to_redraw_grid();
-    area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
-  }
-  if (ui_mode != UI_MENU){
-    draw_menu();              // Draw menu only on enter menu mode
-    ui_mode = UI_MENU;        // Only needed for auto mode setting
-  }
+  ui_mode_menu();
 }
 
 void
@@ -1405,7 +1375,7 @@ menu_invoke(int item)
     break;
 
   case MT_CANCEL:
-    menu_move_back();
+    menu_move_back(false);
     break;
 
   case MT_CALLBACK: {
@@ -1431,7 +1401,6 @@ menu_invoke(int item)
   case MT_KEYPAD:
     uistat.auto_center_marker = false;
     if (menu->type & MT_FORM) {
-      area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
       redraw_frame();         // Remove form numbers
     }
     kp_help_text = (char *)menu->reference;
@@ -1989,7 +1958,7 @@ void set_keypad_value(int v)
 void check_frequency_slider(freq_t slider_freq)
 {
 
-  if ( (maxFreq - minFreq) < setting.slider_span ) {
+  if ( (maxFreq - minFreq) < (freq_t)setting.slider_span) {
     setting.slider_span = maxFreq - minFreq;                         // absolute mode with max step size
   }
   freq_t half_span = setting.slider_span >> 1;
@@ -2124,7 +2093,7 @@ menu_select_touch(int i, int pos)
     if (dt > BUTTON_DOWN_LONG_TICKS || do_exit) {
       selection = -1;
       draw_menu();
-      redraw_request = 0; // reset all (not need update after)
+//      redraw_request = 0; // reset all (not need update after)
       return;
     }
     if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_LOWOUTLEVEL) {
@@ -2354,15 +2323,20 @@ set_numeric_value(void)
 void
 ui_mode_menu(void)
 {
-  if (ui_mode == UI_MENU)
-    return;
-
+//  if (ui_mode == UI_MENU)
+//    return;
   ui_mode = UI_MENU;
-  /* narrowen plotting area */
-  area_width  = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
-  area_height = AREA_HEIGHT_NORMAL;
   ensure_selection();
+  if (current_menu_is_form()) {
+    redraw_frame();
+    area_width = 0;
+    area_height = 0;
+  } else {
+    area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
+    area_height = AREA_HEIGHT_NORMAL;
+  }
   draw_menu();
+  redraw_request|=REDRAW_BATTERY|REDRAW_CAL_STATUS;
 }
 
 static void
@@ -2376,8 +2350,6 @@ ui_mode_keypad(int _keypad_mode)
   keypads = keypads_mode_tbl[_keypad_mode].keypad_type;
 
   ui_mode = UI_KEYPAD;
-  area_width = AREA_WIDTH_NORMAL - MENU_BUTTON_WIDTH;
-  area_height = HEIGHT - NUM_INPUT_HEIGHT;
   if (!current_menu_is_form())
     draw_menu();
   draw_keypad();
@@ -2760,7 +2732,7 @@ ui_process_keypad(void)
     ui_mode_menu(); //Reactivate menu after keypad
     selection = -1;
     ensure_selection();
-    redraw_request|= REDRAW_BATTERY;    // Only redraw battery
+//    redraw_request|= REDRAW_BATTERY;    // Only redraw battery
   } else {
     ui_mode_normal();
 //  request_to_redraw_grid();
