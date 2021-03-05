@@ -2321,7 +2321,11 @@ static void update_waterfall(void){
     ili9341_read_memory(OFFSETX, i  , w_width, 1, w_width*1, spi_buffer);
            ili9341_bulk(OFFSETX, i+1, w_width, 1);
   }
-  index_t *index = trace_index[TRACE_ACTUAL];
+  index_t *index;
+  if (setting.average == AV_OFF)
+    index = trace_index[TRACE_ACTUAL];
+  else
+    index = trace_index[TRACE_TEMP];
   int j = 0;
   for (i=0; i< sweep_points; i++) {			// Add new topline
     uint16_t color;
