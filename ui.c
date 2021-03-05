@@ -1293,7 +1293,8 @@ static void
 ensure_selection(void)
 {
   const menuitem_t *menu = menu_stack[menu_current_level];
-  int i=0;
+  if (selection < 0) {selection = -1; return;}
+  int i;
   if (MT_MASK(menu[0].type) == MT_TITLE && selection == 0) {
     selection = 1;
     return;
@@ -1311,9 +1312,7 @@ menu_move_back(bool leave_ui)
     return;
   erase_menu_buttons();
   menu_current_level--;
-  if (selection >= 0)
-    selection = 0;
-  ensure_selection();
+  selection = -1;
 
   if (leave_ui){
     ui_mode_normal();
@@ -2729,11 +2728,8 @@ ui_process_keypad(void)
   if (current_menu_is_form()) {
     ui_mode_menu(); //Reactivate menu after keypad
     selection = -1;
-    ensure_selection();
-//    redraw_request|= REDRAW_BATTERY;    // Only redraw battery
   } else {
     ui_mode_normal();
-//  request_to_redraw_grid();
   }
   //redraw_all();
 }
@@ -2831,38 +2827,30 @@ static int
 touch_lever_mode_select(int touch_x, int touch_y)
 {
   if (touch_y > HEIGHT) {
-    if (touch_x < FREQUENCIES_XPOS2 -50 && uistat.lever_mode == LM_CENTER) {
-      touch_wait_release();
-      if (setting.freq_mode & FREQ_MODE_CENTER_SPAN)
-        ui_mode_keypad(KM_CENTER);
-      else
-        ui_mode_keypad(KM_START);
-      ui_process_keypad();
-      return TRUE;
+    touch_wait_release();
+    // Touch on left frequency field side
+    if (touch_x < FREQUENCIES_XPOS2 - 50) {
+      if (uistat.lever_mode == LM_CENTER){
+        ui_mode_keypad(FREQ_IS_CENTERSPAN() ? KM_CENTER : KM_START);
+        ui_process_keypad();
+        return TRUE;
+      }
     }
-    if (touch_x >  FREQUENCIES_XPOS2 - 50 && touch_x <  FREQUENCIES_XPOS2 +50) {
-      touch_wait_release();
-      if (FREQ_IS_STARTSTOP())
-        setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      else if (FREQ_IS_CENTERSPAN())
-        setting.freq_mode &= ~FREQ_MODE_CENTER_SPAN;
+    else if (touch_x <  FREQUENCIES_XPOS2 + 50) {
+      // toggle frequency mode start/stop <=> center/span
+      setting.freq_mode^= FREQ_MODE_CENTER_SPAN;
       redraw_request |= REDRAW_FREQUENCY;
       return true;
     }
-    if (touch_x >= FREQUENCIES_XPOS2 +50 && uistat.lever_mode == LM_SPAN) {
-      touch_wait_release();
-      if (setting.freq_mode & FREQ_MODE_CENTER_SPAN)
-        ui_mode_keypad(KM_SPAN);
-      else
-        ui_mode_keypad(KM_STOP);
+    else if (uistat.lever_mode == LM_SPAN) {
+      ui_mode_keypad(FREQ_IS_CW() ? KM_SWEEP_TIME : (FREQ_IS_CENTERSPAN() ? KM_SPAN : KM_STOP));
       ui_process_keypad();
       return TRUE;
     }
     select_lever_mode(touch_x < FREQUENCIES_XPOS2 ? LM_CENTER : LM_SPAN);
-    touch_wait_release();
     return TRUE;
   }
-  if (touch_x <OFFSETX)
+  if (touch_x < OFFSETX)
   {
     return invoke_quick_menu(touch_y);
   }
@@ -2948,7 +2936,6 @@ void ui_process_touch(void)
       // switch menu mode after release
       touch_wait_release();
       selection = -1; // hide keyboard mode selection
-      ensure_selection();
       ui_mode_menu();
       break;
     case UI_MENU:
