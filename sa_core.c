@@ -82,7 +82,7 @@ const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0
 #endif
 
 #ifdef TINYSA4
-#define SWITCH_ATTENUATION  (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 0 : 37)
+#define SWITCH_ATTENUATION  (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 0 : 37 - config.switch_offset)
 //#define POWER_OFFSET    -18             // Max level with all enabled
 //#define POWER_RANGE     70
 #define MAX_DRIVE   (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 3 : 18)
@@ -99,7 +99,7 @@ const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0
 
 
 #else
-#define SWITCH_ATTENUATION  30
+#define SWITCH_ATTENUATION  (30 - config.switch_offset)
 #define POWER_OFFSET    15
 #define MAX_DRIVE   (setting.mode == M_GENHIGH ? 15 : 11)
 #define MIN_DRIVE   8
@@ -4516,35 +4516,39 @@ void calibrate(void)
   in_selftest = true;
   reset_calibration();
   reset_settings(M_LOW);
-  for (int j= 0; j < CALIBRATE_RBWS; j++ ) {
-//    set_RBW(power_rbw[j]);
-//    set_sweep_points(21);
-    test_prepare(TEST_POWER);
-    setting.step_delay_mode = SD_PRECISE;
+  for (int k = 0; k<2; k++) {
+    for (int j= 0; j < CALIBRATE_RBWS; j++ ) {
+      //    set_RBW(power_rbw[j]);
+      //    set_sweep_points(21);
+      test_prepare(TEST_POWER);
+      setting.step_delay_mode = SD_PRECISE;
 #ifndef TINYSA4
-    setting.agc = S_OFF;
-    setting.lna = S_OFF;
+      setting.agc = S_OFF;
+      setting.lna = S_OFF;
 #endif
-    test_acquire(TEST_POWER);                        // Acquire test
-    local_test_status = test_validate(TEST_POWER);                       // Validate test
-    if (peakLevel < -50) {
-      ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
-      ili9341_drawstring_7x13("Signal level too low", 30, 140);
-      ili9341_drawstring_7x13("Check cable between High and Low connectors", 30, 160);
-      goto quit;
-    }
-//    chThdSleepMilliseconds(1000);
-    if (local_test_status != TS_PASS) {
-      ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
-      ili9341_drawstring_7x13("Calibration failed", 30, 140);
-      goto quit;
-    } else {
+      test_acquire(TEST_POWER);                        // Acquire test
+      local_test_status = test_validate(TEST_POWER);                       // Validate test
+      if (k ==0 || k == 1) {
+        if (peakLevel < -50) {
+          ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
+          ili9341_drawstring_7x13("Signal level too low", 30, 140);
+          ili9341_drawstring_7x13("Check cable between High and Low connectors", 30, 160);
+          goto quit;
+        }
+        //    chThdSleepMilliseconds(1000);
+        if (local_test_status != TS_PASS) {
+          ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
+          ili9341_drawstring_7x13("Calibration failed", 30, 140);
+          goto quit;
+        } else {
 #ifdef TINYSA4
-      set_actual_power(-30.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
+          set_actual_power(-30.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
 #else
-      set_actual_power(-25.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
+          set_actual_power(-25.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
 #endif
-      chThdSleepMilliseconds(1000);
+          chThdSleepMilliseconds(1000);
+        }
+      }
     }
   }
 #if 0               // No high input calibration as CAL OUTPUT is unreliable

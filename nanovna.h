@@ -623,6 +623,7 @@ typedef struct config {
   int8_t    cor_nfm;
   uint8_t high_out_adf4350;
   float sweep_voltage;
+  float switch_offset;
   uint32_t    dummy;
 //  uint8_t _reserved[22];
   freq_t checksum;
@@ -895,8 +896,13 @@ typedef struct setting
   int decay;                      // KM_DECAY   < 1000000
   int attack;                     // KM_ATTACK  <   20000
 
-  int32_t  slider_position;
-  uint32_t slider_span;
+#ifdef TINYSA4
+  int32_t slider_position;
+  freq_t  slider_span;
+#else
+  int32_t slider_position;
+  int32_t slider_span;
+#endif
 
   uint32_t rbw_x10;
   uint32_t vbw_x10;

@@ -254,8 +254,6 @@ typedef struct {
 
 static const keypads_t *keypads;
 
-static uint8_t keypads_last_index;
-
 // 7 8 9 G
 // 4 5 6 M
 // 1 2 3 k
@@ -428,6 +426,7 @@ enum {
 #ifdef TINYSA4
   KM_LPF,
 #endif
+  // #35
   KM_NONE // always at enum end
 };
 
@@ -472,7 +471,7 @@ static const struct {
 #endif
   {keypads_positive    , "ATTACK"},    // KM_ATTACK
 #ifdef TINYSA4
-  {keypads_freq        , "ULTRA\nSTART"}, // KM_LPF #34
+  {keypads_freq        , "ULTRA\nSTART"}, // KM_LPF
 #endif
 };
 #if 0 // Not used
@@ -543,12 +542,12 @@ static UI_FUNCTION_ADV_CALLBACK(menu_mode_acb)
   case 0:
 //    if (setting.mode != M_LOW)
 //      set_mode(M_LOW);
-    menu_move_back_and_leave_ui();
+    menu_move_back(true);
     break;
   case 1:
 //    if (setting.mode != M_HIGH)
 //      set_mode(M_HIGH);
-    menu_move_back_and_leave_ui();
+    menu_move_back(true);
     break;
   case 2:
     menu_push_submenu(menu_lowoutputmode);
@@ -571,7 +570,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_load_preset_acb)
     if (data == 0)
       reset_settings(setting.mode);  // Restore factory defaults
   }
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 static UI_FUNCTION_ADV_CALLBACK(menu_store_preset_acb)
@@ -588,7 +587,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_store_preset_acb)
     data = 0;
   }
   caldata_save(data);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 
@@ -611,7 +610,7 @@ UI_FUNCTION_CALLBACK(menu_autosettings_cb)
   //  SetPowerLevel(100); // Reset
   set_clear_storage();
   dirty = true;
-  //  menu_move_back();   // stay in input menu
+  //  menu_move_back(true);   // stay in input menu
   ui_mode_normal();
 //  draw_cal_status();
 }
@@ -622,7 +621,7 @@ static UI_FUNCTION_CALLBACK(menu_calibrate_cb)
   switch (item) {
   case 1:
     sweep_mode = SWEEP_CALIBRATE;
-    menu_move_back_and_leave_ui();
+    menu_move_back(true);
     break;
   case 2:
     reset_calibration();
@@ -638,7 +637,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_scanning_speed_acb)
     return;
   }
   set_step_delay(data);
-//    menu_move_back();
+//    menu_move_back(false);
   ui_mode_normal();
 }
 
@@ -658,7 +657,7 @@ static UI_FUNCTION_CALLBACK(menu_config_cb)
     break;
   case CONFIG_MENUITEM_SELFTEST:
     sweep_mode = 0;         // Suspend sweep to save time
-    menu_move_back_and_leave_ui();
+    menu_move_back(true);
     setting.test = 0;
     setting.test_argument = 0;
     sweep_mode = SWEEP_SELFTEST;
@@ -696,7 +695,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_modulation_acb)
     set_level_sweep(0);
   }
   set_modulation(data);
-  menu_move_back();
+  menu_move_back(false);
 //  ui_mode_normal();   // Stay in menu mode
 //  draw_cal_status();
 }
@@ -728,7 +727,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_reffer_acb)
   }
 //Serial.println(item);
   set_refer_output((int)data - 1);
-  menu_move_back();
+  menu_move_back(false);
 //  ui_mode_normal();   // Stay in menu mode
 //  draw_cal_status();
 }
@@ -754,7 +753,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_lo_drive_acb)
   }
 //Serial.println(item);
   set_lo_drive(data);
-  menu_move_back();
+  menu_move_back(false);
 //  ui_mode_normal();
 //  draw_cal_status();
 }
@@ -769,7 +768,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_mixer_drive_acb)
   }
 //Serial.println(item);
   set_lo_drive(data);
-  menu_move_back();
+  menu_move_back(false);
 //  ui_mode_normal();
 //  draw_cal_status();
 }
@@ -814,7 +813,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_spur_acb)
     toggle_spur();
   } else
     toggle_mirror_masking();
-  //  menu_move_back();
+  //  menu_move_back(false);
   ui_mode_normal();
 }
 #endif
@@ -829,7 +828,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_extra_lna_acb)
     return;
   }
   toggle_extra_lna();
-  //  menu_move_back();
+  //  menu_move_back(false);
   ui_mode_normal();
 }
 
@@ -842,7 +841,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_adf_out_acb)
     return;
   }
   toggle_high_out_adf4350();
-  //  menu_move_back();
+  //  menu_move_back(false);
   ui_mode_normal();
 }
 
@@ -868,7 +867,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
     b->icon = data == setting.measurement ? BUTTON_ICON_GROUP_CHECKED : BUTTON_ICON_GROUP;
     return;
   }
-  menu_move_back();
+  menu_move_back(false);
 #ifdef __MEASURE__
   switch(data) {
     case M_OFF:                                     // Off
@@ -1042,7 +1041,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_atten_acb)
     return;
   }
   set_auto_attenuation();
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 static UI_FUNCTION_ADV_CALLBACK(menu_atten_high_acb)
@@ -1054,7 +1053,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_atten_high_acb)
   }
   setting.auto_attenuation = false;
   set_attenuation(data);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 static UI_FUNCTION_ADV_CALLBACK(menu_reflevel_acb)
@@ -1066,7 +1065,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_reflevel_acb)
     return;
   }
   set_auto_reflevel(true);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 static UI_FUNCTION_ADV_CALLBACK(menu_storage_acb)
@@ -1127,7 +1126,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_average_acb)
     return;
   }
   set_average(data);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 extern const menuitem_t menu_marker_modify[];
@@ -1183,7 +1182,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_marker_modify_acb)
   }
   markmap_all_markers();
 //  redraw_marker(active_marker, TRUE);
-//  menu_move_back();
+//  menu_move_back(false);
 }
 
 static UI_FUNCTION_CALLBACK(menu_marker_delete_cb)
@@ -1193,7 +1192,7 @@ static UI_FUNCTION_CALLBACK(menu_marker_delete_cb)
   if (active_marker>=0){
     markers[active_marker].enabled = false;
     markmap_all_markers();
-    menu_move_back();
+    menu_move_back(false);
   }
 }
 
@@ -1217,7 +1216,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_rbw_acb)
     return;
   }
   set_RBW(rbwsel_x10[data]);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 static UI_FUNCTION_ADV_CALLBACK(menu_unit_acb)
@@ -1228,7 +1227,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_unit_acb)
     return;
   }
   set_unit(data);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 
 #if 0
@@ -1244,7 +1243,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_scale_per_acb)
     return;
   }
   set_scale(menu_scale_per_value[data]);
-  menu_move_back_and_leave_ui();
+  menu_move_back(true);
 }
 #endif
 
@@ -1269,7 +1268,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_trigger_acb)
     set_trigger(setting.trigger_mode);
   } else if (data != T_DONE) {
     set_trigger(data);
-//  menu_move_back();
+//  menu_move_back(false);
     ui_mode_normal();
   }
   completed = true;
@@ -1412,8 +1411,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_pause_acb)
     return;
   }
   toggle_sweep();
-//  menu_move_back();
-//  ui_mode_normal();
+//  menu_move_back(true);
 //  draw_cal_status();
 }
 
@@ -1427,8 +1425,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_send_display_acb)
     return;
   }
   auto_capture = ! auto_capture;
-//  menu_move_back();
-//  ui_mode_normal();
+//  menu_move_back(true);
 //  draw_cal_status();
 }
 #endif
@@ -2480,7 +2477,7 @@ void
 menu_move_top(void)
 {
   while (menu_current_level > 0)
-    menu_move_back();
+    menu_move_back(false);
 }
 
 

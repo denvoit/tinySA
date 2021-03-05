@@ -874,7 +874,7 @@ VNA_SHELL_FUNCTION(cmd_capture)
   // read pixel count at one time (PART*2 bytes required for read buffer)
   (void)argc;
   (void)argv;
-  int i, y;
+  int y;
 #ifdef TINYSA4  
 #if SPI_BUFFER_SIZE < (2*LCD_WIDTH)
 #error "Low size of spi_buffer for cmd_capture"
@@ -889,32 +889,29 @@ VNA_SHELL_FUNCTION(cmd_capture)
     // use uint16_t spi_buffer[2048] (defined in ili9341) for read buffer
     uint8_t *buf = (uint8_t *)spi_buffer;
     ili9341_read_memory(0, y, LCD_WIDTH, 2, 2 * LCD_WIDTH, spi_buffer);
-    for (i = 0; i < 4 * LCD_WIDTH; i++) {
-      streamPut(shell_stream, *buf++);
-    }
+    streamWrite(shell_stream, (void*)buf, 2 * 2 * LCD_WIDTH);
   }
 }
 
 void send_region(const char *t, int x, int y, int w, int h)
 {
-  shell_printf("%s\r\n", t);
-  streamPut(shell_stream, (((uint16_t) x) & 0xff));
-  streamPut(shell_stream, (((uint16_t)x>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) y) & 0xff));
-  streamPut(shell_stream, (((uint16_t)y>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) w) & 0xff));
-  streamPut(shell_stream, (((uint16_t)w>>8) & 0xff));
-  streamPut(shell_stream, (((uint16_t) h) & 0xff));
-  streamPut(shell_stream, (((uint16_t)h>>8) & 0xff));
+  shell_printf(t);
+  struct {
+    char new_str[2];
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+  } region={"\r\n", x,y,w,h};
+  streamWrite(shell_stream, (void*)&region, sizeof(region));
 }
 
 void send_buffer(uint8_t * buf, int s)
 {
-  for (int i = 0; i < s; i++) {
-    streamPut(shell_stream, *buf++);
-  }
-  shell_printf("ch> \r\n");
+  streamWrite(shell_stream, (void*) buf, s);
+  streamWrite(shell_stream, (void*)"ch> \r\n", 6);
 }
+
 #if 0
 VNA_SHELL_FUNCTION(cmd_gamma)
 {
@@ -1008,6 +1005,7 @@ config_t config = {
   .high_out_adf4350 = true,
 #endif
   .sweep_voltage = 3.3,
+  .switch_offset = 0.0,
 };
 
 //properties_t current_props;
@@ -1182,35 +1180,36 @@ VNA_SHELL_FUNCTION(cmd_scan)
 static void
 update_marker_index(void)
 {
-  int m;
-  int i;
+  int m, idx;
+  freq_t fstart = get_sweep_frequency(ST_START);
+  freq_t fstop  = get_sweep_frequency(ST_STOP);
   for (m = 0; m < MARKERS_MAX; m++) {
     if (!markers[m].enabled)
       continue;
     freq_t f = markers[m].frequency;
-    freq_t fstart = get_sweep_frequency(ST_START);
-    freq_t fstop  = get_sweep_frequency(ST_STOP);
-    if (f < fstart) {
-      markers[m].index = 0;
-      markers[m].frequency = fstart;
-    } else if (f >= fstop) {
-      markers[m].index = sweep_points-1;
-      markers[m].frequency = fstop;
-    } else {
-      for (i = 0; i < sweep_points-1; i++) {
-        if (frequencies[i] <= f && f < frequencies[i+1]) {
-          markers[m].index = f < (frequencies[i] / 2 + frequencies[i + 1] / 2) ? i : i + 1;
-          markers[m].frequency = frequencies[markers[m].index ];
-          break;
-        }
-      }      
+    if (f == 0) idx = markers[m].index; // Not need update index in no freq
+    else if (f < fstart) idx = 0;
+    else if (f >= fstop) idx = sweep_points-1;
+    else { // Search frequency index for marker frequency
+#if 1
+      for (idx = 1; idx < sweep_points; idx++) {
+        if (frequencies[idx] <= f) continue;
+        if (f < (frequencies[idx-1]/2 + frequencies[idx]/2)) idx--; // Correct closest idx
+        break;
+      }
+#else
+      float r = ((float)(f - fstart))/(fstop - fstart);
+      idx = r * (sweep_points-1);
+#endif
     }
+    markers[m].index = idx;
+    markers[m].frequency = frequencies[idx];
   }
 }
 
 void set_marker_frequency(int m, freq_t f)
 {
-  if (m < 0 || !markers[m].enabled)
+  if (m == MARKER_INVALID || !markers[m].enabled)
     return;
   int i = 1;
   markers[m].mtype &= ~M_TRACKING;

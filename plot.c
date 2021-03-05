@@ -1697,6 +1697,7 @@ redraw_marker(int marker)
   redraw_request|=REDRAW_AREA;
 }
 
+#if 0  // Not used
 void
 request_to_draw_cells_behind_menu(void)
 {
@@ -1715,6 +1716,7 @@ request_to_draw_cells_behind_numeric_input(void)
   invalidate_rect(0, LCD_HEIGHT-NUM_INPUT_HEIGHT, LCD_WIDTH-1, LCD_HEIGHT-1);
   redraw_request |= REDRAW_CELLS;
 }
+#endif
 
 static void
 cell_blit_bitmap(int x, int y, uint16_t w, uint16_t h, const uint8_t *bmp)
