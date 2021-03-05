@@ -883,7 +883,6 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[0].mtype = M_REFERENCE | M_TRACKING;
       kp_help_text = "Frequency of fundamental";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       set_sweep_frequency(ST_START, 0);
       set_sweep_frequency(ST_STOP, uistat.value*5);
       set_measurement(M_IMD);
@@ -898,11 +897,9 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[1].mtype = M_TRACKING;
       kp_help_text = "Frequency of left signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       int left =  uistat.value;
       kp_help_text = "Right signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       int right =  uistat.value;
       set_sweep_frequency(ST_CENTER, (left+right)/2);
       set_sweep_frequency(ST_SPAN, (right - left)*5);
@@ -920,10 +917,8 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[1].mtype = M_DELTA | M_NOISE;
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       kp_help_text = "Frequency offset";
       ui_mode_keypad(KM_SPAN);
-      ui_process_keypad();
       set_sweep_frequency(ST_SPAN, uistat.value*4);
       set_measurement(M_PHASE_NOISE);
       set_average(4);
@@ -937,10 +932,8 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[2].mtype = M_DELTA;
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       kp_help_text = "Width of signal";
       ui_mode_keypad(KM_SPAN);
-      ui_process_keypad();
       set_sweep_frequency(ST_SPAN, uistat.value*4);
       set_measurement(M_STOP_BAND);
 //      SetAverage(4);
@@ -956,10 +949,8 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[2].mtype = M_DELTA;
 //      kp_help_text = "Frequency of signal";
 //      ui_mode_keypad(KM_CENTER);
-//      ui_process_keypad();
 //      kp_help_text = "Width of signal";
 //      ui_mode_keypad(KM_SPAN);
-//      ui_process_keypad();
 //      set_sweep_frequency(ST_SPAN, uistat.value*2);
       set_measurement(M_PASS_BAND);
 //      SetAverage(4);
@@ -980,11 +971,9 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[0].mtype = M_REFERENCE;// | M_TRACKING;
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       center = uistat.value;
       kp_help_text = "Modulation frequency, 3 .. 10 kHz";
       ui_mode_keypad(KM_SPAN);
-      ui_process_keypad();
 //      if (uistat.value < 3000)
 //        break;
       span = uistat.value;
@@ -1005,18 +994,15 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       markers[0].mtype = M_REFERENCE;
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
-      ui_process_keypad();
       set_marker_frequency(0, uistat.value);
       kp_help_text = "Modulation frequency: 1 .. 2.5kHz";
       ui_mode_keypad(KM_SPAN);
-      ui_process_keypad();
       if (uistat.value < 1000 || uistat.value > 2500)
         break;
       set_RBW(uistat.value/100);
       // actual_rbw_x10
       kp_help_text = "Frequency deviation: 3 .. 500kHz";
       ui_mode_keypad(KM_SPAN);
-      ui_process_keypad();
       if (uistat.value < 12000)
         uistat.value = 12000;   // minimum span
       set_sweep_frequency(ST_SPAN, uistat.value*4);
@@ -1097,7 +1083,6 @@ static UI_FUNCTION_ADV_CALLBACK(menu_storage_acb)
       if (setting.subtract_stored) {
         kp_help_text = "Ref level";
         ui_mode_keypad(KM_REFLEVEL);
-        ui_process_keypad();
 //        setting.normalize_level = uistat.value;
       } else
         set_auto_reflevel(true);
@@ -2530,7 +2515,6 @@ int invoke_quick_menu(int y)
     if (y < quick_menu_y[i]) {
       if ((uint32_t)quick_menu[i] < KM_NONE) {
         ui_mode_keypad((int)quick_menu[i]);
-        ui_process_keypad();
       } else {
         selection = -1;
         menu_current_level = 0;

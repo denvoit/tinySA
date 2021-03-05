@@ -794,7 +794,6 @@ menu_velocity_cb(int item, uint8_t data)
       ui_process_numeric();
   } else {
       ui_mode_keypad(KM_VELOCITY_FACTOR);
-      ui_process_keypad();
   }
 }
 
@@ -839,7 +838,6 @@ menu_scale_cb(int item, uint8_t data)
     ui_process_numeric();
   } else {
     ui_mode_keypad(data);
-    ui_process_keypad();
   }
 }
 
@@ -858,7 +856,6 @@ menu_stimulus_cb(int item, uint8_t data)
       ui_process_numeric();
     } else {
       ui_mode_keypad(item);
-      ui_process_keypad();
     }
     break;
   case 5: /* PAUSE */
@@ -1411,7 +1408,6 @@ menu_invoke(int item)
         kp_help_text = "240..960Mhz";
     }
     ui_mode_keypad(menu->data);
-    ui_process_keypad();
     redraw_request |= REDRAW_CAL_STATUS;
     break;
   }
@@ -2348,6 +2344,7 @@ ui_mode_keypad(int _keypad_mode)
     draw_menu();
   draw_keypad();
   draw_numeric_area_frame();
+  ui_process_keypad();
 }
 
 void
@@ -2827,7 +2824,6 @@ touch_lever_mode_select(int touch_x, int touch_y)
     if (touch_x < FREQUENCIES_XPOS2 - 50) {
       if (uistat.lever_mode == LM_CENTER){
         ui_mode_keypad(FREQ_IS_CENTERSPAN() ? KM_CENTER : KM_START);
-        ui_process_keypad();
         return TRUE;
       }
     }
@@ -2839,7 +2835,6 @@ touch_lever_mode_select(int touch_x, int touch_y)
     }
     else if (uistat.lever_mode == LM_SPAN) {
       ui_mode_keypad(FREQ_IS_CW() ? KM_SWEEP_TIME : (FREQ_IS_CENTERSPAN() ? KM_SPAN : KM_STOP));
-      ui_process_keypad();
       return TRUE;
     }
     select_lever_mode(touch_x < FREQUENCIES_XPOS2 ? LM_CENTER : LM_SPAN);
@@ -2940,11 +2935,11 @@ void ui_process_touch(void)
   }
 }
 
-static int previous_button_state = 0;
+static uint16_t previous_button_state = 0;
 #ifdef __REMOTE_DESKTOP__
-static int previous_mouse_state = 0;
-static int previous_mouse_x = 0;
-static int previous_mouse_y = 0;
+static uint16_t previous_mouse_state = 0;
+static int16_t previous_mouse_x = 0;
+static int16_t previous_mouse_y = 0;
 #endif
 
 void
