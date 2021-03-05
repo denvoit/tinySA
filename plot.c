@@ -1104,7 +1104,7 @@ static uint16_t get_trigger_level(void){
 static inline void
 markmap_trigger_area(void){
   uint16_t tp = get_trigger_level();
-  markmap[current_mappage][tp/CELLWIDTH] = 0xFFFF;
+  markmap[current_mappage][tp/CELLWIDTH] = (map_t)0xFFFFFFFF;
 }
 
 //
@@ -2265,7 +2265,7 @@ static void draw_battery_status(void)
   string_buf[x++] = 0b10000001;
   string_buf[x++] = 0b11111111;
   // Draw battery
-  blit8BitWidthBitmap(7, BATTERY_START, 8, x, string_buf);
+  ili9341_blitBitmap(7, BATTERY_START, 8, x, string_buf);
   plot_printf((char*)string_buf, sizeof string_buf, "%.2fv", vbat/1000.0);
   ili9341_drawstring((char*)string_buf, 1, BATTERY_START+x+3);
 }

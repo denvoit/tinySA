@@ -826,8 +826,7 @@ void ili9341_set_foreground(uint16_t fg_idx);
 void ili9341_set_background(uint16_t bg_idx);
 
 void ili9341_clear_screen(void);
-void blit8BitWidthBitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t *bitmap);
-void blit16BitWidthBitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint16_t *bitmap);
+void ili9341_blitBitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t *bitmap);
 void ili9341_drawchar(uint8_t ch, int x, int y);
 void ili9341_drawstring(const char *str, int x, int y);
 void ili9341_drawstring_7x13(const char *str, int x, int y);

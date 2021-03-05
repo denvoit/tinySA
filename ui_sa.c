@@ -495,13 +495,11 @@ static const menuitem_t  menu_modulation[];
 static const menuitem_t  menu_top[];
 static const menuitem_t  menu_reffer[];
 static const menuitem_t  menu_modulation[];
-static const menuitem_t  menu_drive_wide[];
+//static const menuitem_t  menu_drive_wide[];
 #ifdef TINYSA4
 static const menuitem_t  menu_settings3[];
 #endif
 static const menuitem_t  menu_sweep[];
-
-#define AUTO_ICON(S) (S>=2?BUTTON_ICON_CHECK_AUTO:S)            // Depends on order of ICONs!!!!!
 
 static UI_FUNCTION_ADV_CALLBACK(menu_sweep_acb)
 {
@@ -972,7 +970,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
       center = uistat.value;
-      kp_help_text = "Modulation frequency, 3 .. 10 kHz";
+      kp_help_text = "Modulation frequency: 3 .. 10kHz";
       ui_mode_keypad(KM_SPAN);
 //      if (uistat.value < 3000)
 //        break;
@@ -2546,9 +2544,7 @@ void draw_cal_status(void)
   int x = 0;
   int y = OFFSETY;
   unsigned int color;
-  int rounding = false;
-  if (!UNIT_IS_LINEAR(setting.unit))
-    rounding  = true;
+  const bool rounding = !UNIT_IS_LINEAR(setting.unit);
   const char * const unit = unit_string[setting.unit];
 redraw_cal_status:
   buf[6]=0;

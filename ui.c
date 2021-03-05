@@ -105,6 +105,10 @@ static const uint8_t slider_bitmap[]=
 #define BUTTON_ICON_GROUP            4
 #define BUTTON_ICON_GROUP_CHECKED    5
 
+#define CHECK_ICON(S) ((S) ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK)
+#define GROUP_ICON(S) ((S) ? BUTTON_ICON_GROUP_CHECKED : BUTTON_ICON_GROUP)
+#define AUTO_ICON(S)  (S>=2?BUTTON_ICON_CHECK_AUTO:S)            // Depends on order of ICONs!!!!!
+
 #define BUTTON_BORDER_NONE           0x00
 #define BUTTON_BORDER_WIDTH_MASK     0x0F
 
@@ -1861,13 +1865,13 @@ draw_menu_buttons(const menuitem_t *menu)
       ili9341_set_background(button.bg);
       uint16_t text_offs = button_start + 6;
       if (button.icon >=0){
-        blit8BitWidthBitmap(button_start+3, y+(MENU_BUTTON_HEIGHT-ICON_HEIGHT)/2, ICON_WIDTH, ICON_HEIGHT, &check_box[button.icon*2*ICON_HEIGHT]);
+        ili9341_blitBitmap(button_start+3, y+(MENU_BUTTON_HEIGHT-ICON_HEIGHT)/2, ICON_WIDTH, ICON_HEIGHT, &check_box[button.icon*2*ICON_HEIGHT]);
         text_offs = button_start+6+ICON_WIDTH+1;
       }
 #ifdef __ICONS__
       if (menu[i].type & MT_ICON) {
-        blit8BitWidthBitmap(button_start+MENU_FORM_WIDTH-2*FORM_ICON_WIDTH-8,y+(button_height-FORM_ICON_HEIGHT)/2,FORM_ICON_WIDTH,FORM_ICON_HEIGHT,& left_icons[((menu[i].data >>4)&0xf)*2*FORM_ICON_HEIGHT]);
-        blit8BitWidthBitmap(button_start+MENU_FORM_WIDTH-  FORM_ICON_WIDTH-8,y+(button_height-FORM_ICON_HEIGHT)/2,FORM_ICON_WIDTH,FORM_ICON_HEIGHT,&right_icons[((menu[i].data >>0)&0xf)*2*FORM_ICON_HEIGHT]);
+        ili9341_blitBitmap(button_start+MENU_FORM_WIDTH-2*FORM_ICON_WIDTH-8,y+(button_height-FORM_ICON_HEIGHT)/2,FORM_ICON_WIDTH,FORM_ICON_HEIGHT,& left_icons[((menu[i].data >>4)&0xf)*2*FORM_ICON_HEIGHT]);
+        ili9341_blitBitmap(button_start+MENU_FORM_WIDTH-  FORM_ICON_WIDTH-8,y+(button_height-FORM_ICON_HEIGHT)/2,FORM_ICON_WIDTH,FORM_ICON_HEIGHT,&right_icons[((menu[i].data >>0)&0xf)*2*FORM_ICON_HEIGHT]);
       }
 #endif
       int local_slider_positions = 0;
@@ -1896,7 +1900,7 @@ draw_menu_buttons(const menuitem_t *menu)
         draw_slider:
           if (local_slider_positions < button_start)
             local_slider_positions = button_start;
-          blit8BitWidthBitmap(local_slider_positions - 4, y, 7, 5, slider_bitmap);
+          ili9341_blitBitmap(local_slider_positions - 4, y, 7, 5, slider_bitmap);
         } else if (menu[i].data == KM_HIGHOUTLEVEL) {
           local_slider_positions = ((get_level() - level_min() ) * (MENU_FORM_WIDTH-8)) / level_range() + OFFSETX+4;
           goto draw_slider;
@@ -1913,7 +1917,7 @@ draw_menu_buttons(const menuitem_t *menu)
       ili9341_set_background(button.bg);
       uint16_t text_offs = button_start + 7;
       if (button.icon >=0){
-        blit8BitWidthBitmap(button_start+2, y+(MENU_BUTTON_HEIGHT-ICON_HEIGHT)/2, ICON_WIDTH, ICON_HEIGHT, &check_box[button.icon*2*ICON_HEIGHT]);
+        ili9341_blitBitmap(button_start+2, y+(MENU_BUTTON_HEIGHT-ICON_HEIGHT)/2, ICON_WIDTH, ICON_HEIGHT, &check_box[button.icon*2*ICON_HEIGHT]);
         text_offs = button_start+2+ICON_WIDTH;
       }
       int lines = menu_is_multiline(button.text);
