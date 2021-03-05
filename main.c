@@ -1058,10 +1058,10 @@ void load_LCD_properties(void)
 //setting.checksum = 0;
 }
 
+#ifdef __VNA__
 void
 ensure_edit_config(void)
 {
-#ifdef __VNA__
   if (active_props == &current_props)
     return;
 
@@ -1069,8 +1069,8 @@ ensure_edit_config(void)
   active_props = &current_props;
   // move to uncal state
   cal_status = 0;
-#endif
 }
+#endif
 
 #include "sa_core.c"
 #ifdef __AUDIO__
@@ -1267,81 +1267,57 @@ update_frequencies(void)
 void
 set_sweep_frequency(int type, freq_t freq)
 {
-#ifdef __VNA__
-  int cal_applied = cal_status & CALSTAT_APPLY;
-#endif
-
   // Check frequency for out of bounds (minimum SPAN can be any value)
   if (type != ST_SPAN && freq < START_MIN)
     freq = START_MIN;
   if (freq > STOP_MAX)
     freq = STOP_MAX;
-  // CW mode if span freq = 0
-  if (type == ST_SPAN && freq == 0){
-    type = ST_CW;
-    freq = setting.frequency0 / 2 + setting.frequency1 / 2;
-  }
-  ensure_edit_config();
+  bool cw_mode = FREQ_IS_CW(); // remember old mode
+  freq_t center, span;
   switch (type) {
     case ST_START:
       setting.freq_mode &= ~FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency0 != freq) {
-        setting.frequency0 = freq;
-        // if start > stop then make start = stop
-        if (setting.frequency1 < freq) setting.frequency1 = freq;
-      }
+      setting.frequency0 = freq;
+      // if start > stop then make start = stop
+      if (setting.frequency1 < freq) setting.frequency1 = freq;
       break;
     case ST_STOP:
       setting.freq_mode &= ~FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency1 != freq) {
-        setting.frequency1 = freq;
-        // if start > stop then make start = stop
-        if (setting.frequency0 > freq) setting.frequency0 = freq;
-      }
+      setting.frequency1 = freq;
+      // if start > stop then make start = stop
+      if (setting.frequency0 > freq) setting.frequency0 = freq;
       break;
     case ST_CENTER:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      freq_t center = setting.frequency0 / 2 + setting.frequency1 / 2;
-      if (center != freq) {
-        freq_t span = setting.frequency1 - setting.frequency0;
-        if (freq < START_MIN + span / 2) {
-          span = (freq - START_MIN) * 2;
-        }
-        if (freq > STOP_MAX - span / 2) {
-          span = (STOP_MAX - freq) * 2;
-        }
-        setting.frequency0 = freq - span / 2;
-        setting.frequency1 = freq + span / 2;
-      }
+      center = setting.frequency0/2 + setting.frequency1/2;
+      span   = (setting.frequency1 - setting.frequency0)/2;
+      if (freq < START_MIN + span)
+        span = (freq - START_MIN);
+      if (freq > STOP_MAX - span)
+        span = (STOP_MAX - freq);
+      setting.frequency0 = freq - span;
+      setting.frequency1 = freq + span;
       break;
     case ST_SPAN:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency1 - setting.frequency0 != freq) {
-        freq_t center = setting.frequency0 / 2 + setting.frequency1 / 2;
-        if (center < START_MIN + freq / 2) {
-          center = START_MIN + freq / 2;
-        }
-        if (center > STOP_MAX - freq / 2) {
-          center = STOP_MAX - freq / 2;
-        }
-        setting.frequency0 = center - freq / 2;
-        setting.frequency1 = center + freq / 2;
-      }
+      center = setting.frequency0/2 + setting.frequency1/2;
+      span = freq/2;
+      if (center < START_MIN + span)
+        center = START_MIN + span;
+      if (center > STOP_MAX - span)
+        center = STOP_MAX - span;
+      setting.frequency0 = center - span;
+      setting.frequency1 = center + span;
       break;
     case ST_CW:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency0 != freq || setting.frequency1 != freq) {
-        setting.frequency0 = freq;
-        setting.frequency1 = freq;
-        setting.sweep_time_us = 0; // use minimum as start
-      }
+      setting.frequency0 = freq;
+      setting.frequency1 = freq;
       break;
   }
+  if (!cw_mode && FREQ_IS_CW()) // switch to CW mode
+    setting.sweep_time_us = 0;  // use minimum as start
   update_frequencies();
-#ifdef __VNA__
-  if (cal_auto_interpolate && cal_applied)
-    cal_interpolate(lastsaveid);
-#endif
 }
 
 freq_t
