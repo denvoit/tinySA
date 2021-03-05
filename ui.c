@@ -500,7 +500,6 @@ show_version(void)
     do {shift>>=1; y+=5;} while (shift&1);
     ili9341_drawstring(info_about[i++], x, y+=5);
   }
-  //char buf[96];
 #ifdef TINYSA4
 extern const char *states[];
   #define ENABLE_THREADS_COMMAND
@@ -518,6 +517,7 @@ extern const char *states[];
 #else
     uint32_t stklimit = 0U;
 #endif
+    char buf[96];
     plot_printf(buf, sizeof(buf), "%08x|%08x|%08x|%08x|%4u|%4u|%9s|%12s",
              stklimit, (uint32_t)tp->ctx.sp, max_stack_use, (uint32_t)tp,
              (uint32_t)tp->refs - 1, (uint32_t)tp->prio, states[tp->state],
@@ -540,6 +540,7 @@ extern const char *states[];
 #ifdef __USE_RTC__
     uint32_t tr = rtc_get_tr_bin(); // TR read first
     uint32_t dr = rtc_get_dr_bin(); // DR read second
+    char buf[96];
     plot_printf(buf, sizeof(buf), "Time: 20%02d/%02d/%02d %02d:%02d:%02d" " (LS%c)",
       RTC_DR_YEAR(dr),
       RTC_DR_MONTH(dr),
@@ -1905,12 +1906,6 @@ draw_menu_buttons(const menuitem_t *menu)
           goto draw_slider;
         }
       }
-#if 0
-      if (MT_MASK(menu[i].type) == MT_ADV_CALLBACK && menu[i].reference == menu_sdrive_acb) {
-        local_slider_positions = ((menu_drive_value[setting.lo_drive] + 38 ) * (MENU_FORM_WIDTH-8)) / 51 + OFFSETX+4;
-        goto draw_slider;
-      }
-#endif
 //      ili9341_drawstring_size(button.text, text_offs, y+(button_height-2*FONT_GET_HEIGHT)/2-local_text_shift, 2);
       ili9341_drawstring_10x14(button.text, text_offs, y+(button_height-wFONT_GET_HEIGHT)/2-local_text_shift);
     } else {
@@ -1973,7 +1968,7 @@ void check_frequency_slider(freq_t slider_freq)
 static void
 menu_select_touch(int i, int pos)
 {
-  int32_t step = 0;
+  long_t step = 0;
   int do_exit = false;
   selection = i;
   draw_menu();
