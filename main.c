@@ -891,8 +891,8 @@ VNA_SHELL_FUNCTION(cmd_capture)
   for (y = 0; y < LCD_HEIGHT; y += 2) {
     // use uint16_t spi_buffer[2048] (defined in ili9341) for read buffer
     uint8_t *buf = (uint8_t *)spi_buffer;
-    ili9341_read_memory(0, y, LCD_WIDTH, 2, 2 * LCD_WIDTH, spi_buffer);
-    streamWrite(shell_stream, (void*)buf, 2 * 2 * LCD_WIDTH);
+    ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
+    streamWrite(shell_stream, (void*)buf, 2 * LCD_WIDTH * sizeof(uint16_t));
   }
 }
 

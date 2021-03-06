@@ -1527,7 +1527,7 @@ int display_test(void)
       for (int w = 0; w < LCD_WIDTH; w++) {
         spi_buffer[w] = 0;
       }
-      ili9341_read_memory(0, h, LCD_WIDTH, 1, LCD_WIDTH, spi_buffer);
+      ili9341_read_memory(0, h, LCD_WIDTH, 1, spi_buffer);
       for (int w = 0; w < LCD_WIDTH; w++) {
         if (spi_buffer[w] != ((w*h) & 0xfff))
           return false;
@@ -1544,12 +1544,10 @@ int display_test(void)
 static void update_waterfall(void){
   int i;
   int w_width = area_width < WIDTH ? area_width : WIDTH;
-  // Waterfall only in 290 or 145 points
-//  if (!(sweep_points == 290 || sweep_points == 145))
-//    return;
+//  START_PROFILE;
   for (i = CHART_BOTTOM-1; i >=graph_bottom+1; i--) {		// Scroll down
-    ili9341_read_memory(OFFSETX, i  , w_width, 1, w_width*1, spi_buffer);
-           ili9341_bulk(OFFSETX, i+1, w_width, 1);
+    ili9341_read_memory(OFFSETX, i, w_width, 1, spi_buffer);
+    ili9341_bulk(OFFSETX, i+1, w_width, 1);
   }
   index_y_t *index;
   if (setting.average == AV_OFF)
@@ -1605,6 +1603,7 @@ static void update_waterfall(void){
     }
   }
   ili9341_bulk(OFFSETX, graph_bottom+1, w_width, 1);
+//  STOP_PROFILE;
 }
 
 int get_waterfall(void)
