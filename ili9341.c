@@ -26,8 +26,6 @@
 
 #include "spi.h"
 
-
-
 // Allow enable DMA for read display data
 #ifdef TINYSA4
 #define __USE_DISPLAY_DMA_RX__
@@ -58,10 +56,10 @@
 #define LCD_SPI_RX_SPEED SPI_BR_DIV4
 #endif
 
-uint16_t spi_buffer[SPI_BUFFER_SIZE];
+pixel_t spi_buffer[SPI_BUFFER_SIZE];
 // Default foreground & background colors
-uint16_t foreground_color = 0;
-uint16_t background_color = 0;
+pixel_t foreground_color = 0;
+pixel_t background_color = 0;
 
 // Display width and height definition
 #define ILI9341_WIDTH     LCD_WIDTH
@@ -357,11 +355,8 @@ void set_SPI_mode(uint16_t mode){
 static void send_command(uint8_t cmd, uint8_t len, const uint8_t *data)
 {
 // Uncomment on low speed SPI (possible get here before previous tx complete)
-#ifndef TINYSA4
-  while (SPI_IN_TX_RX(LCD_SPI));
-#endif
+//  while (SPI_IN_TX_RX(LCD_SPI));
 #ifdef TINYSA4
-//  while (SPI_IN_TX_RX);
   set_SPI_mode(SPI_MODE_LCD);
 #endif
   LCD_CS_LOW;
@@ -517,7 +512,9 @@ static void ili9341_setWindow(int x, int y, int w, int h){
   send_command(ILI9341_PAGE_ADDRESS_SET, 4, (uint8_t *)&yy);
 }
 
-void ili9341_bulk_8bit(int x, int y, int w, int h, uint16_t *palette)
+#if 0
+// Test code for palette mode
+void ili9341_bulk_8bit(int x, int y, int w, int h, pixel_t *palette)
 {
   ili9341_setWindow(x, y ,w, h);
   send_command(ILI9341_MEMORY_WRITE, 0, NULL);
@@ -528,27 +525,62 @@ void ili9341_bulk_8bit(int x, int y, int w, int h, uint16_t *palette)
     spi_TxWord(palette[*buf++]);
 //  LCD_CS_HIGH;
 }
+#endif
+
+#if DISPLAY_CELL_BUFFER_COUNT != 1
+#define LCD_BUFFER_1    0x01
+#define LCD_DMA_RUN     0x02
+static uint8_t LCD_dma_status = 0;
+#endif
+
+pixel_t *ili9341_get_cell_buffer(void){
+#if DISPLAY_CELL_BUFFER_COUNT == 1
+  return spi_buffer;
+#else
+  return &spi_buffer[(LCD_dma_status&LCD_BUFFER_1) ? SPI_BUFFER_SIZE/2 : 0];
+#endif
+}
 
 #ifndef __USE_DISPLAY_DMA__
-void ili9341_fill(int x, int y, int w, int h, uint16_t color)
+void ili9341_fill(int x, int y, int w, int h, pixel_t color)
 {
   ili9341_setWindow(x, y ,w, h);
   send_command(ILI9341_MEMORY_WRITE, 0, NULL);
-  int32_t len = w * h;
-  while (len-- > 0)
-    spi_TxWord(color);
-//  LCD_CS_HIGH;
+  uint32_t len = w * h;
+  do {
+    while (SPI_TX_IS_NOT_EMPTY(LCD_SPI))
+      ;
+    SPI_WRITE_16BIT(LCD_SPI, color);
+  }while(--len);
+#ifdef __REMOTE_DESKTOP__
+  if (auto_capture) {
+     send_region("fill", x,y,w,h);
+     send_buffer((uint8_t *)&background_color, 2);
+  }
+#endif
 }
 
 void ili9341_bulk(int x, int y, int w, int h)
 {
   ili9341_setWindow(x, y ,w, h);
   send_command(ILI9341_MEMORY_WRITE, 0, NULL);
-  int32_t len = w * h;
-  while (len-- > 0)
-    spi_TxWord(*buf++);
-//  LCD_CS_HIGH;
+  spi_TxBuffer((uint8_t *)spi_buffer, w * h * sizeof(pixel_t));
+#ifdef __REMOTE_DESKTOP__
+  if (auto_capture) {
+     send_region("bulk", x,y,w,h);
+     send_buffer((uint8_t *)buffer, w *h * sizeof(pixel_t));
+  }
+#endif
 }
+
+void ili9341_bulk_continue(int x, int y, int w, int h){
+  ili9341_bulk(x, y, w, h);
+}
+
+void ili9341_bulk_finish(void){
+  while (SPI_IS_BUSY(LCD_SPI));      // Wait tx
+}
+
 #else
 //
 // Use DMA for send data
@@ -563,36 +595,57 @@ void ili9341_fill(int x, int y, int w, int h)
   dmaStreamSetMode(dmatx, txdmamode | STM32_DMA_CR_PSIZE_HWORD | STM32_DMA_CR_MSIZE_HWORD);
 #ifdef __REMOTE_DESKTOP__
   if (auto_capture) {
-     send_region("fill", x,y,w,h);
-     send_buffer((uint8_t *)&background_color, 2);
+     send_region("fill", x, y, w, h);
+     send_buffer((uint8_t *)&background_color, sizeof(pixel_t));
   }
 #endif
   dmaStreamFlush(w * h);
+}
+
+void ili9341_bulk_finish(void){
+  dmaWaitCompletion(dmatx);        // Wait DMA
+  while (SPI_IN_TX_RX(LCD_SPI));   // Wait tx
+}
+
+static void ili9341_DMA_bulk(int x, int y, int w, int h, pixel_t *buffer){
+  ili9341_setWindow(x, y ,w, h);
+  send_command(ILI9341_MEMORY_WRITE, 0, NULL);
+
+  dmaStreamSetMemory0(dmatx, buffer);
+  dmaStreamSetMode(dmatx, txdmamode | STM32_DMA_CR_PSIZE_HWORD | STM32_DMA_CR_MSIZE_HWORD | STM32_DMA_CR_MINC);
+  dmaStreamSetTransactionSize(dmatx, w * h);
+  dmaStreamEnable(dmatx);
+#ifdef __REMOTE_DESKTOP__
+  if (auto_capture) {
+     send_region("bulk", x, y, w, h);
+     send_buffer((uint8_t *)buffer, w *h * sizeof(pixel_t));
+  }
+#endif
 }
 
 // Copy spi_buffer to region
 void ili9341_bulk(int x, int y, int w, int h)
 {
-  ili9341_setWindow(x, y ,w, h);
-  send_command(ILI9341_MEMORY_WRITE, 0, NULL);
-
-  // Init Tx DMA mem->spi, set size, mode (spi and mem data size is 16 bit)
-  dmaStreamSetMemory0(dmatx, spi_buffer);
-  dmaStreamSetMode(dmatx, txdmamode | STM32_DMA_CR_PSIZE_HWORD |
-                              STM32_DMA_CR_MSIZE_HWORD | STM32_DMA_CR_MINC);
-#ifdef __REMOTE_DESKTOP__
-  if (auto_capture) {
-     send_region("bulk", x,y,w,h);
-     send_buffer((uint8_t *)spi_buffer, w*h*2);
-  }
-#endif
-  dmaStreamFlush(w * h);
+  ili9341_DMA_bulk(x, y ,w, h, spi_buffer);  // Send data
+  ili9341_bulk_finish();                     // Wait
 }
 #endif
 
+// Copy part of spi_buffer to region, no wait completion after if buffer count !=1
+void ili9341_bulk_continue(int x, int y, int w, int h)
+{
+#if DISPLAY_CELL_BUFFER_COUNT == 1
+  ili9341_bulk(x, y, w, h);
+#else
+  ili9341_bulk_finish();                                    // Wait DMA
+  ili9341_DMA_bulk(x, y , w, h, ili9341_get_cell_buffer()); // Send new cell data
+  LCD_dma_status^=LCD_BUFFER_1;                             // Switch buffer
+#endif
+}
+
 #ifndef __USE_DISPLAY_DMA_RX__
 
-void ili9341_read_memory(int x, int y, int w, int h, int len, uint16_t *out)
+void ili9341_read_memory(int x, int y, int w, int h, int len, pixel_t *out)
 {
   ili9341_setWindow(x, y ,w, h);
   send_command(ILI9341_MEMORY_READ, 0, NULL);
@@ -627,7 +680,7 @@ void ili9341_read_memory(int x, int y, int w, int h, int len, uint16_t *out)
 #else
 // Copy screen data to buffer
 // Warning!!! buffer size must be greater then 3*len + 1 bytes
-void ili9341_read_memory(int x, int y, int w, int h, int len, uint16_t *out)
+void ili9341_read_memory(int x, int y, int w, int h, int len, pixel_t *out)
 {
   uint16_t dummy_tx = 0;
   uint8_t *rgbbuf = (uint8_t *)out;

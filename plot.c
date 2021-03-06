@@ -47,7 +47,6 @@ uint16_t area_width  = AREA_WIDTH_NORMAL;
 uint16_t area_height; // initialized in main()  = AREA_HEIGHT_NORMAL;
 
 // Cell render use spi buffer
-typedef uint16_t pixel_t;
 pixel_t *cell_buffer = (pixel_t *)spi_buffer;
 
 // Check buffer size
@@ -771,17 +770,14 @@ static const uint8_t marker_bitmap[]={
 static void
 markmap_marker(int marker)
 {
-  int t;
   if (!markers[marker].enabled)
     return;
-  for (t = TRACE_ACTUAL; t <= TRACE_ACTUAL; t++) {
-    if (!trace[t].enabled)
-      continue;
-    int idx = markers[marker].index;
-    int x = trace_index_x[idx] - X_MARKER_OFFSET;
-    int y = trace_index_y[t][idx] - Y_MARKER_OFFSET;
-    invalidate_rect(x, y, x+MARKER_WIDTH-1, y+MARKER_HEIGHT-1);
-  }
+  if (!trace[TRACE_ACTUAL].enabled)
+    return;
+  int idx = markers[marker].index;
+  int x = trace_index_x[idx] - X_MARKER_OFFSET;
+  int y = trace_index_y[TRACE_ACTUAL][idx] - Y_MARKER_OFFSET;
+  invalidate_rect(x, y, x+MARKER_WIDTH-1, y+MARKER_HEIGHT-1);
 }
 
 void
@@ -860,7 +856,7 @@ draw_cell(int m, int n)
   if (w <= 0 || h <= 0)
     return;
 //  PULSE;
-
+  cell_buffer = ili9341_get_cell_buffer();
   // Clear buffer ("0 : height" lines)
 #if 0
   // use memset 350 system ticks for all screen calls
@@ -960,13 +956,10 @@ draw_cell(int m, int n)
 //  PULSE;
 // draw marker symbols on each trace (<10 system ticks for all screen calls)
 #if 1
-  for (i = 0; i < MARKERS_MAX; i++) {
-    if (!markers[i].enabled)
-      continue;
-//    for (t = 0; t < TRACES_MAX; t++) {
-//      if (!trace[t].enabled)
-//        continue;
-      t = TRACE_ACTUAL;
+  if (trace[TRACE_ACTUAL].enabled) {
+    for (i = 0; i < MARKERS_MAX; i++) {
+      if (!markers[i].enabled)
+        continue;
       int idx = markers[i].index;
       int x = trace_index_x[idx] - x0 - X_MARKER_OFFSET;
       int y = trace_index_y[t][idx] - y0 - Y_MARKER_OFFSET;
@@ -980,7 +973,7 @@ draw_cell(int m, int n)
           ili9341_set_foreground(LCD_BG_COLOR);
           cell_blit_bitmap(x, y, MARKER_WIDTH, MARKER_HEIGHT, MARKER_BITMAP(i+1));
       }
-//    }
+    }
   }
 #endif
 // Draw trace and marker info on the top (50 system ticks for all screen calls)
@@ -1021,7 +1014,7 @@ draw_cell(int m, int n)
   }
 #endif
   // Draw cell (500 system ticks for all screen calls)
-  ili9341_bulk(OFFSETX + x0, OFFSETY + y0, w, h);
+  ili9341_bulk_continue(OFFSETX + x0, OFFSETY + y0, w, h);
 }
 
 static void
@@ -1030,21 +1023,27 @@ draw_all_cells(bool flush_markmap)
   int m, n;
 //  START_PROFILE
   for (m = 0; m < (area_width+CELLWIDTH-1) / CELLWIDTH; m++)
-    for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++) {
-      if ((markmap[0][n] | markmap[1][n]) & (1 << m)) {
+    for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++)
+      if ((markmap[0][n] | markmap[1][n]) & (1 << m))
         draw_cell(m, n);
-//        ili9341_fill(m*CELLWIDTH+10, n*CELLHEIGHT, 2, 2, RGB565(255,0,0));
-      }
-//      else
-//        ili9341_fill(m*CELLWIDTH+10, n*CELLHEIGHT, 2, 2, RGB565(0,255,0));
+#if 0
+  // Used for debug control cell update
+  ili9341_bulk_finish();
+  for (m = 0; m < (area_width+CELLWIDTH-1) / CELLWIDTH; m++)
+    for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++) {
+      ili9341_set_background(((markmap[0][n] | markmap[1][n]) & (1 << m)) ? LCD_LOW_BAT_COLOR : LCD_NORMAL_BAT_COLOR);
+      ili9341_fill(m*CELLWIDTH+OFFSETX, n*CELLHEIGHT, 2, 2);
     }
-//  STOP_PROFILE
+#endif
   if (flush_markmap) {
     // keep current map for update
     swap_markmap();
     // clear map for next plotting
     clear_markmap();
   }
+  // Flush LCD buffer, wait completion (need call after end use ili9341_bulk_continue mode)
+  ili9341_bulk_finish();
+//  STOP_PROFILE
 }
 
 void
