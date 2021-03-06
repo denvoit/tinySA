@@ -68,8 +68,8 @@
 #define __SINGLE_LETTER__
 #define __NICE_BIG_FONT__
 #define __QUASI_PEAK__
-#ifdef TINYSA4
 #define __REMOTE_DESKTOP__
+#ifdef TINYSA4
 #define  __HARMONIC__
 #endif
 

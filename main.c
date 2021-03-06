@@ -895,21 +895,27 @@ VNA_SHELL_FUNCTION(cmd_capture)
 
 void send_region(const char *t, int x, int y, int w, int h)
 {
-  shell_printf(t);
-  struct {
-    char new_str[2];
-    uint16_t x;
-    uint16_t y;
-    uint16_t w;
-    uint16_t h;
-  } region={"\r\n", x,y,w,h};
-  streamWrite(shell_stream, (void*)&region, sizeof(region));
+  if (SDU1.config->usbp->state == USB_ACTIVE) {
+    shell_printf(t);
+    struct {
+      char new_str[2];
+      uint16_t x;
+      uint16_t y;
+      uint16_t w;
+      uint16_t h;
+    } region={"\r\n", x,y,w,h};
+    streamWrite(shell_stream, (void*)&region, sizeof(region));
+  }
+  else
+    auto_capture = false;
 }
 
 void send_buffer(uint8_t * buf, int s)
 {
-  streamWrite(shell_stream, (void*) buf, s);
-  streamWrite(shell_stream, (void*)"ch> \r\n", 6);
+  if (SDU1.config->usbp->state == USB_ACTIVE) {
+    streamWrite(shell_stream, (void*) buf, s);
+    streamWrite(shell_stream, (void*)"ch> \r\n", 6);
+  }
 }
 
 #if 0
