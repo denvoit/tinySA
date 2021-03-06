@@ -2590,44 +2590,8 @@ keypad_click(int key)
       scale /= 1000000000.0;
     }
     /* numeric input done */
-    double value = my_atof(kp_buf) * scale;
-#if 1
-    uistat.value = value;
+    uistat.value = my_atof(kp_buf) * scale;
     set_numeric_value();
-#else
-    switch (keypad_mode) {
-    case KM_START:
-      set_sweep_frequency(ST_START, value);
-      break;
-    case KM_STOP:
-      set_sweep_frequency(ST_STOP, value);
-      break;
-    case KM_CENTER:
-      set_sweep_frequency(ST_CENTER, value);
-      break;
-    case KM_SPAN:
-      set_sweep_frequency(ST_SPAN, value);
-      break;
-    case KM_CW:
-      set_sweep_frequency(ST_CW, value);
-      break;
-    case KM_SCALE:
-      set_trace_scale(uistat.current_trace, value);
-      break;
-    case KM_REFPOS:
-      set_trace_refpos(uistat.current_trace, value);
-      break;
-    case KM_EDELAY:
-      set_electrical_delay(value); // pico seconds
-      break;
-    case KM_VELOCITY_FACTOR:
-      velocity_factor = value / 100.0;
-      break;
-    case KM_SCALEDELAY:
-      set_trace_scale(uistat.current_trace, value * 1e-12); // pico second
-      break;
-    }
-#endif
     return KP_DONE;
   } else if (c <= 9 && kp_index < NUMINPUT_LEN) {
     kp_buf[kp_index++] = '0' + c;
