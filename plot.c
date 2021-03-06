@@ -967,7 +967,7 @@ draw_cell(int m, int n)
       if ((uint32_t)(x+MARKER_WIDTH ) < (CELLWIDTH  + MARKER_WIDTH ) &&
           (uint32_t)(y+MARKER_HEIGHT) < (CELLHEIGHT + MARKER_HEIGHT)){
           // Draw marker plate
-          ili9341_set_foreground(LCD_TRACE_1_COLOR + t);
+          ili9341_set_foreground(LCD_TRACE_1_COLOR + TRACE_ACTUAL);
           cell_blit_bitmap(x, y, MARKER_WIDTH, MARKER_HEIGHT, MARKER_BITMAP(0));
           // Draw marker number
           ili9341_set_foreground(LCD_BG_COLOR);
