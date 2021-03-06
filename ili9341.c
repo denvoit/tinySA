@@ -65,6 +65,11 @@
 #define __USE_DISPLAY_DMA_RX__
 #endif
 
+// Disable DMA rx on disabled DMA tx
+#ifndef __USE_DISPLAY_DMA__
+#undef __USE_DISPLAY_DMA_RX__
+#endif
+
 pixel_t spi_buffer[SPI_BUFFER_SIZE];
 // Default foreground & background colors
 pixel_t foreground_color = 0;
@@ -515,19 +520,19 @@ static void ili9341_setWindow(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
 }
 
 #ifndef __USE_DISPLAY_DMA__
-void ili9341_fill(int x, int y, int w, int h, pixel_t color)
+void ili9341_fill(int x, int y, int w, int h)
 {
-  ili9341_setWindow(x, y ,w, h);
+  ili9341_setWindow(x, y, w, h);
   send_command(ILI9341_MEMORY_WRITE, 0, NULL);
   uint32_t len = w * h;
   do {
     while (SPI_TX_IS_NOT_EMPTY(LCD_SPI))
       ;
-    SPI_WRITE_16BIT(LCD_SPI, color);
+    SPI_WRITE_16BIT(LCD_SPI, background_color);
   }while(--len);
 #ifdef __REMOTE_DESKTOP__
   if (auto_capture) {
-     send_region("fill", x,y,w,h);
+     send_region("fill", x, y, w, h);
      send_buffer((uint8_t *)&background_color, 2);
   }
 #endif
@@ -535,13 +540,13 @@ void ili9341_fill(int x, int y, int w, int h, pixel_t color)
 
 void ili9341_bulk(int x, int y, int w, int h)
 {
-  ili9341_setWindow(x, y ,w, h);
+  ili9341_setWindow(x, y, w, h);
   send_command(ILI9341_MEMORY_WRITE, 0, NULL);
   spi_TxBuffer((uint8_t *)spi_buffer, w * h * sizeof(pixel_t));
 #ifdef __REMOTE_DESKTOP__
   if (auto_capture) {
-     send_region("bulk", x,y,w,h);
-     send_buffer((uint8_t *)buffer, w *h * sizeof(pixel_t));
+     send_region("bulk", x, y, w, h);
+     send_buffer((uint8_t *)buffer, w * h * sizeof(pixel_t));
   }
 #endif
 }
@@ -586,7 +591,7 @@ static void ili9341_DMA_bulk(uint16_t x, uint16_t y, uint16_t w, uint16_t h, pix
 // Copy spi_buffer to region
 void ili9341_bulk(int x, int y, int w, int h)
 {
-  ili9341_DMA_bulk(x, y ,w, h, spi_buffer);  // Send data
+  ili9341_DMA_bulk(x, y, w, h, spi_buffer);  // Send data
   dmaWaitCompletion(dmatx);
 }
 
@@ -612,9 +617,9 @@ void ili9341_bulk_finish(void){
 #ifndef ili9341_bulk_continue
 void ili9341_bulk_continue(int x, int y, int w, int h)
 {
-  ili9341_bulk_finish();                                    // Wait DMA
-  ili9341_DMA_bulk(x, y , w, h, ili9341_get_cell_buffer()); // Send new cell data
-  LCD_dma_status^=LCD_BUFFER_1;                             // Switch buffer
+  ili9341_bulk_finish();                                   // Wait DMA
+  ili9341_DMA_bulk(x, y, w, h, ili9341_get_cell_buffer()); // Send new cell data
+  LCD_dma_status^=LCD_BUFFER_1;                            // Switch buffer
 }
 #endif
 #endif // end LCD DMA mode
