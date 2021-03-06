@@ -1937,9 +1937,9 @@ int16_t Si446x_RSSI(void)
       my_microsecond_delay(SI4432_step_delay * ((setting.R == 0 && old_R > 5 ) ? 8 : 1));
       ADF4351_frequency_changed = false;
       SI4463_frequency_changed = false;
+      SI4463_offset_changed = false;
     } else if (SI4432_offset_delay && SI4463_offset_changed) {
       my_microsecond_delay(SI4432_offset_delay);
-      ADF4351_frequency_changed = false;
       SI4463_offset_changed = false;
     }
 #define SAMPLE_COUNT 1
