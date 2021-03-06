@@ -103,16 +103,16 @@
 #define MARKER_COUNT    4
 
 #define TRACES_MAX 3
-//#define TRACE_AGE       3
-#define TRACE_ACTUAL    2
+#define TRACE_ACTUAL    0
 #define TRACE_STORED    1
-#define TRACE_TEMP      0
+#define TRACE_TEMP      2
+//#define TRACE_AGE       3
 #define TRACE_INVALID  -1
 
-// #define age_t     measured[TRACE_AGE]
-#define stored_t  measured[TRACE_STORED]
 #define actual_t  measured[TRACE_ACTUAL]
+#define stored_t  measured[TRACE_STORED]
 #define temp_t    measured[TRACE_TEMP]
+// #define age_t     measured[TRACE_AGE]
 
 #ifdef TINYSA3
 typedef uint32_t freq_t;
@@ -568,11 +568,6 @@ float value(float);
 
 typedef struct trace {
   uint8_t enabled;
-  uint8_t type;
-  uint8_t channel;
-  uint8_t reserved;
-  float scale;
-  float refpos;
 } trace_t;
 
 #define FREQ_MODE_START_STOP    0x0
@@ -633,13 +628,6 @@ extern config_t config;
 //#define settingLevelOffset config.level_offset
 float get_level_offset(void);
 
-void set_trace_type(int t, int type);
-void set_trace_channel(int t, int channel);
-void set_trace_scale(float scale);
-void set_trace_refpos(float refpos);
-float get_trace_scale(int t);
-float get_trace_refpos(int t);
-const char *get_trace_typename(int t);
 extern int in_selftest;
 extern int display_test(void);
 
@@ -778,9 +766,9 @@ extern volatile uint8_t redraw_request;
 [LCD_MENU_COLOR       ] = RGB565(230,230,230), \
 [LCD_MENU_TEXT_COLOR  ] = RGB565(  0,  0,  0), \
 [LCD_MENU_ACTIVE_COLOR] = RGB565(210,210,210), \
-[LCD_TRACE_1_COLOR    ] = RGB565(255,  0,  0), \
+[LCD_TRACE_1_COLOR    ] = RGB565(255,255,  0), \
 [LCD_TRACE_2_COLOR    ] = RGB565(  0,255,  0), \
-[LCD_TRACE_3_COLOR    ] = RGB565(255,255,  0), \
+[LCD_TRACE_3_COLOR    ] = RGB565(255,  0,  0), \
 [LCD_TRACE_4_COLOR    ] = RGB565(255,  0,255), \
 [LCD_NORMAL_BAT_COLOR ] = RGB565( 31,227,  0), \
 [LCD_LOW_BAT_COLOR    ] = RGB565(255,  0,  0), \
@@ -921,6 +909,8 @@ typedef struct setting
   freq_t frequency1;
   freq_t frequency_IF;
 
+  float trace_scale;
+  float trace_refpos;
   trace_t _trace[TRACES_MAX];
   marker_t _markers[MARKERS_MAX];
 
@@ -944,6 +934,11 @@ typedef struct setting
 extern setting_t setting;
 
 void reset_settings(int m);
+
+void set_trace_scale(float scale);
+void set_trace_refpos(float refpos);
+#define get_trace_scale()  setting.trace_scale
+#define get_trace_refpos() setting.trace_refpos
 
 #define S_IS_AUTO(x) ((x)&2)
 #define S_STATE(X) ((X)&1)

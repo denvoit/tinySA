@@ -1013,9 +1013,9 @@ config_t config = {
 
 // NanoVNA Default settings
 static const trace_t def_trace[TRACES_MAX] = {//enable, type, channel, reserved, scale, refpos
-    { 0, TRC_LOGMAG, 0, 0, 10.0, (float) NGRIDY+1 },  //Temp
-    { 0, TRC_LOGMAG, 1, 0, 10.0, (float) NGRIDY+1 },  //Stored
-    { 1, TRC_LOGMAG, 2, 0, 10.0, (float) NGRIDY+1 }   //Actual
+ [TRACE_TEMP]   = { 0},  //Temp
+ [TRACE_STORED] = { 0},  //Stored
+ [TRACE_ACTUAL] = { 1}   //Actual
 };
 
 static const marker_t def_markers[MARKERS_MAX] = {
@@ -1043,6 +1043,8 @@ void load_LCD_properties(void)
 //=============================================
   setting._electrical_delay = 0.0;
 #endif
+  setting.trace_scale = 10.0;
+  setting.trace_refpos = 0;
   memcpy(setting._trace, def_trace, sizeof(def_trace));
   memcpy(setting._markers, def_markers, sizeof(def_markers));
 #ifdef __VNA__
@@ -1795,91 +1797,24 @@ VNA_SHELL_FUNCTION(cmd_recall)
   shell_printf("recall {id}\r\n");
 }
 
-static const struct {
-  const char *name;
-  uint16_t refpos;
-  float scale_unit;
-} trace_info[] = {
-  { "LOGMAG", NGRIDY,  10.0 },
-#ifdef __VNA__
-  { "PHASE",  NGRIDY/2,  90.0 },
-  { "DELAY",  NGRIDY/2,  1e-9 },
-  { "SMITH",         0,  1.00 },
-  { "POLAR",         0,  1.00 },
-  { "LINEAR",        0,  0.125},
-  { "SWR",           0,  0.25 },
-  { "REAL",   NGRIDY/2,  0.25 },
-  { "IMAG",   NGRIDY/2,  0.25 },
-  { "R",      NGRIDY/2, 100.0 },
-  { "X",      NGRIDY/2, 100.0 }
-#endif
-};
-
-#ifdef __VNA__
-static const char * const trc_channel_name[] = {
-  "CH0", "CH1"
-};
-#endif
 const char * const trc_channel_name[] = {
-  "ACTUAL", "STORED", "COMPUTED"
+  [TRACE_ACTUAL] = "ACTUAL",
+  [TRACE_STORED] = "STORED",
+  [TRACE_TEMP]   = "COMPUTED",
 };
-const char *get_trace_typename(int t)
-{
-  return trace_info[trace[t].type].name;
-}
-
-void set_trace_type(int t, int type)
-{
-  int enabled = type != TRC_OFF;
-  int force = FALSE;
-
-  if (trace[t].enabled != enabled) {
-    trace[t].enabled = enabled;
-    force = TRUE;
-  }
-  if (trace[t].type != type) {
-    trace[t].type = type;
-    // Set default trace refpos
-    trace[t].refpos = trace_info[type].refpos;
-    // Set default trace scale
-    trace[t].scale  = trace_info[type].scale_unit;
-    force = TRUE;
-  }
-  if (force) {
-    plot_into_index(measured);
-    redraw_request |= REDRAW_AREA;
-  }
-}
-
 
 void set_trace_scale(float scale)
 {
-  if (trace[TRACE_ACTUAL].scale != scale){
-    trace[TRACE_ACTUAL].scale = scale;
-    trace[TRACE_STORED].scale = scale;
-    trace[TRACE_TEMP].scale = scale;
-    redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
-  }
-}
-
-float get_trace_scale(int t)
-{
-  return trace[t].scale;
+  if (setting.trace_scale == scale) return;
+  setting.trace_scale = scale;
+  redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
 }
 
 void set_trace_refpos(float refpos)
 {
-  if (trace[TRACE_ACTUAL].refpos != refpos){
-    trace[TRACE_ACTUAL].refpos = refpos;
-    trace[TRACE_STORED].refpos = refpos;
-    trace[TRACE_TEMP].refpos = refpos;
-    redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
-  }
-}
-
-float get_trace_refpos(int t)
-{
-  return trace[t].refpos;
+  if (setting.trace_refpos == refpos) return;
+  setting.trace_refpos = refpos;
+  redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
 }
 
 VNA_SHELL_FUNCTION(cmd_trace)
@@ -1889,9 +1824,9 @@ VNA_SHELL_FUNCTION(cmd_trace)
     for (t = 0; t < TRACES_MAX; t++) {
       if (trace[t].enabled) {
         const char *type = unit_string[setting.unit]; // get_trace_typename(t);
-        const char *channel = trc_channel_name[trace[t].channel];
-        float scale = get_trace_scale(t);
-        float refpos = get_trace_refpos(t);
+        const char *channel = trc_channel_name[t];
+        float scale = get_trace_scale();
+        float refpos = get_trace_refpos();
         shell_printf("%d %s %s %f %f\r\n", t, type, channel, scale, refpos);
       }
     }
@@ -1902,8 +1837,8 @@ VNA_SHELL_FUNCTION(cmd_trace)
     t = my_atoi(argv[0]);
     if (argc != 1 || t < 0 || t >= TRACES_MAX)
       goto usage;
-    const char *type = get_trace_typename(t);
-    const char *channel = trc_channel_name[trace[t].channel];
+    const char *type = "LOGMAG";//unit_string[setting.unit];
+    const char *channel = trc_channel_name[t];
     shell_printf("%d %s %s\r\n", t, type, channel);
     return;
   }

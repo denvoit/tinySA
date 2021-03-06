@@ -355,11 +355,10 @@ trace_into_index_x(int i){
 }
 
 static index_y_t
-trace_into_index_y(int t, int i, float array[POINTS_COUNT])
+trace_into_index_y(float coeff)
 {
-  float coeff = array[i];
-  float refpos = get_trace_refpos(t);
-  float scale = get_trace_scale(t);
+  float refpos = get_trace_refpos();
+  float scale = get_trace_scale();
   float v = (refpos - value(coeff)) / scale;
   if (v <  0) v = 0;
   if (v > NGRIDY) v = NGRIDY;
@@ -521,7 +520,7 @@ markmap_upperarea(void)
 }
 
 static uint16_t get_trigger_level(void){
-  return trace_into_index_y(TRACE_ACTUAL, 0, &setting.trigger_level);
+  return trace_into_index_y(setting.trigger_level);
 }
 
 static inline void
@@ -822,10 +821,9 @@ plot_into_index(measurement_t measured)
   for (t = 0; t < TRACES_MAX; t++) {
     if (!trace[t].enabled)
       continue;
-    int ch = trace[t].channel;
     index_y_t *index_y = trace_index_y[t];
     for (i = 0; i < sweep_points; i++)
-      index_y[i] = trace_into_index_y(t, i, measured[ch]);
+      index_y[i] = trace_into_index_y(measured[t][i]);
   }
 //  STOP_PROFILE
   mark_cells_from_index();
@@ -882,7 +880,7 @@ draw_cell(int m, int n)
   uint32_t trace_type = 0;
   for (t = 0; t < TRACES_MAX; t++) {
     if (trace[t].enabled) {
-      trace_type |= (1 << trace[t].type);
+      trace_type |= RECTANGULAR_GRID_MASK;
     }
   }
   // Draw rectangular plot (40 system ticks for all screen calls)
@@ -1223,8 +1221,8 @@ static void cell_grid_line_info(int x0, int y0)
   int xpos = GRID_X_TEXT - x0;
   int ypos = 0 - y0 + 2;
   ili9341_set_foreground(LCD_GRID_VALUE_COLOR);
-  float   ref = get_trace_refpos(TRACE_ACTUAL);
-  float scale = get_trace_scale(TRACE_ACTUAL);;
+  float   ref = get_trace_refpos();
+  float scale = get_trace_scale();
   for (int i = 0; i < NGRIDY; i++){
     if (ypos >= CELLHEIGHT) break;
     if (ypos >= -FONT_GET_HEIGHT){
@@ -1396,7 +1394,7 @@ static void cell_draw_marker_info(int x0, int y0)
 //        cell_drawstring_7x13(buf, xpos, ypos);
       trace_get_value_string(
           t, &buf[k], (sizeof buf) - k,
-          idx, measured[trace[t].channel], ridx, markers[i].mtype,markers[i].frequency, markers[ref_marker].frequency);
+          idx, measured[t], ridx, markers[i].mtype,markers[i].frequency, markers[ref_marker].frequency);
 #if 1
       int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
 //      int ypos = 1 + (j/2)*(13) - y0;
