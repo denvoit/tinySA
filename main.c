@@ -358,6 +358,39 @@ int shell_serial_printf(const char *fmt, ...)
   return formatted_bytes;
 }
 #endif
+
+//
+// Function used for search substring v in list
+// Example need search parameter "center" in "start|stop|center|span|cw" getStringIndex return 2
+// If not found return -1
+// Used for easy parse command arguments
+static int get_str_index(const char *v, const char *list)
+{
+  int i = 0;
+  while (1) {
+    const char *p = v;
+    while (1) {
+      char c = *list;
+      if (c == '|') c = 0;
+      if (c == *p++) {
+        // Found, return index
+        if (c == 0) return i;
+        list++;    // Compare next symbol
+        continue;
+      }
+      break;  // Not equal, break
+    }
+    // Set new substring ptr
+    while (1) {
+      // End of string, not found
+      if (*list == 0) return -1;
+      if (*list++ == '|') break;
+    }
+    i++;
+  }
+  return -1;
+}
+
 VNA_SHELL_FUNCTION(cmd_pause)
 {
   (void)argc;
@@ -386,7 +419,7 @@ VNA_SHELL_FUNCTION(cmd_reset)
   (void)argv;
 
   if (argc == 1) {
-    if (strcmp(argv[0], "dfu") == 0) {
+    if (get_str_index(argv[0], "dfu") == 0) {
       shell_printf("Performing reset to DFU mode\r\n");
       enter_dfu();
       return;
@@ -550,37 +583,6 @@ my_atof(const char *p)
   return x;
 }
 
-//
-// Function used for search substring v in list
-// Example need search parameter "center" in "start|stop|center|span|cw" getStringIndex return 2
-// If not found return -1
-// Used for easy parse command arguments
-static int get_str_index(char *v, const char *list)
-{
-  int i = 0;
-  while (1) {
-    char *p = v;
-    while (1) {
-      char c = *list;
-      if (c == '|') c = 0;
-      if (c == *p++) {
-        // Found, return index
-        if (c == 0) return i;
-        list++;    // Compare next symbol
-        continue;
-      }
-      break;  // Not equal, break
-    }
-    // Set new substring ptr
-    while (1) {
-      // End of string, not found
-      if (*list == 0) return -1;
-      if (*list++ == '|') break;
-    }
-    i++;
-  }
-  return -1;
-}
 #ifdef __VNA__
 VNA_SHELL_FUNCTION(cmd_offset)
 {
@@ -692,7 +694,7 @@ VNA_SHELL_FUNCTION(cmd_clearconfig)
     return;
   }
 
-  if (strcmp(argv[0], "1234") != 0) {
+  if (get_str_index(argv[0], "1234") != 0) {
     shell_printf("Key unmatched.\r\n");
     return;
   }
@@ -802,10 +804,11 @@ VNA_SHELL_FUNCTION(cmd_data)
   if (argc == 1)
     sel = my_atoi(argv[0]);
 
-
   if (sel >= 0 && sel <= MAX_DATA) {
+    static const uint8_t sel_conv[]={TRACE_TEMP, TRACE_STORED, TRACE_ACTUAL};
+    float *data = measured[sel_conv[sel]];
     for (i = 0; i < sweep_points; i++)
-      shell_printf("%f\r\n", value(measured[sel][i]));
+      shell_printf("%f\r\n", value(data[i]));
     return;
   }
   shell_printf("usage: data [0-2]\r\n");
@@ -1176,9 +1179,9 @@ VNA_SHELL_FUNCTION(cmd_scan)
     if (mask) {
       for (i = 0; i < points; i++) {
         if (mask & 1) shell_printf("%U ", frequencies[i]);
-        if (mask & 2) shell_printf("%f %f ", value(measured[2][i]), 0.0);
-        if (mask & 4) shell_printf("%f %f ", value(measured[1][i]), 0.0);
-        if (mask & 8) shell_printf("%f %f ", value(measured[0][i]), 0.0);
+        if (mask & 2) shell_printf("%f %f ", value(measured[TRACE_ACTUAL][i]), 0.0);
+        if (mask & 4) shell_printf("%f %f ", value(measured[TRACE_STORED][i]), 0.0);
+        if (mask & 8) shell_printf("%f %f ", value(measured[TRACE_TEMP][i]), 0.0);
         shell_printf("\r\n");
       }
     }
@@ -1883,7 +1886,7 @@ VNA_SHELL_FUNCTION(cmd_trace)
   if (argc == 2) {
     switch (get_str_index(argv[0], cmd_scale_ref_list)) {
     case 0:
-      if (strcmp(argv[1],"auto") == 0) {
+      if (get_str_index(argv[1],"auto") == 0) {
         set_auto_reflevel(true);
       } else {
         user_set_scale(my_atof(argv[1]));
@@ -1891,7 +1894,7 @@ VNA_SHELL_FUNCTION(cmd_trace)
       goto update;
     case 1:
       //trace[t].refpos = my_atof(argv[2]);
-      if (strcmp(argv[1],"auto") == 0) {
+      if (get_str_index(argv[1],"auto") == 0) {
         set_auto_reflevel(true);
       } else {
         user_set_reflevel(my_atof(argv[1]));
@@ -1950,7 +1953,7 @@ VNA_SHELL_FUNCTION(cmd_marker)
     return;
   }
   redraw_request |= REDRAW_MARKER;
-  if (strcmp(argv[0], "off") == 0) {
+  if (get_str_index(argv[0], "off") == 0) {
     active_marker = MARKER_INVALID;
     for (t = 0; t < MARKERS_MAX; t++)
       markers[t].enabled = FALSE;
@@ -2670,7 +2673,7 @@ static void VNAShell_executeLine(char *line)
   // Execute line
   const VNAShellCommand *scp;
   for (scp = commands; scp->sc_name != NULL; scp++) {
-    if (strcmp(scp->sc_name, shell_args[0]) == 0) {
+    if (get_str_index(scp->sc_name, shell_args[0]) == 0) {
       if (scp->flags & CMD_WAIT_MUTEX) {
         shell_function = scp->sc_function;
         operation_requested|=OP_CONSOLE;
