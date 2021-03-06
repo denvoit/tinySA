@@ -962,7 +962,7 @@ draw_cell(int m, int n)
         continue;
       int idx = markers[i].index;
       int x = trace_index_x[idx] - x0 - X_MARKER_OFFSET;
-      int y = trace_index_y[t][idx] - y0 - Y_MARKER_OFFSET;
+      int y = trace_index_y[TRACE_ACTUAL][idx] - y0 - Y_MARKER_OFFSET;
       // Check marker icon on cell
       if ((uint32_t)(x+MARKER_WIDTH ) < (CELLWIDTH  + MARKER_WIDTH ) &&
           (uint32_t)(y+MARKER_HEIGHT) < (CELLHEIGHT + MARKER_HEIGHT)){
