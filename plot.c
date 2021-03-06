@@ -541,19 +541,30 @@ cell_drawline(int x0, int y0, int x1, int y1, int c)
   if (y0 >= CELLHEIGHT && y1 >= CELLHEIGHT) return;
 
   // modifed Bresenham's line algorithm, see https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-  if (x1 < x0) { SWAP(x0, x1); SWAP(y0, y1); }
-  int dx = x1 - x0;
-  int dy = y1 - y0, sy = 1; if (dy < 0) { dy = -dy; sy = -1; }
-  int err = (dx > dy ? dx : -dy) / 2;
-
+  // Draw from top to bottom (most graph contain vertical lines)
+  if (y1 < y0) { SWAP(x0, x1); SWAP(y0, y1); }
+  int dx =-(x1 - x0), sx = 1; if (dx > 0) { dx = -dx; sx = -sx; }
+  int dy = (y1 - y0);
+  int err = ((dy + dx) < 0 ? -dx : -dy) / 2;
+  // Fast skip points while y0 < 0
+  if (y0 < 0){
+    while(1){
+      int e2 = err;
+      if (e2 > dx) { err-= dy; x0+=sx;}
+      if (e2 < dy) { err-= dx; y0++; if (y0 == 0) break;}
+    }
+  }
+  // align y by CELLWIDTH for faster calculations
+  y0*=CELLWIDTH;
+  y1*=CELLWIDTH;
   while (1) {
-    if (y0 >= 0 && y0 < CELLHEIGHT && x0 >= 0 && x0 < CELLWIDTH)
-      cell_buffer[y0 * CELLWIDTH + x0] |= c;
+    if ((uint32_t)x0 < CELLWIDTH)
+      cell_buffer[y0 + x0]|= c;
     if (x0 == x1 && y0 == y1)
       return;
     int e2 = err;
-    if (e2 > -dx) { err -= dy; x0++;  }
-    if (e2 <  dy) { err += dx; y0+=sy;}
+    if (e2 > dx) { err-= dy; x0+=sx;}
+    if (e2 < dy) { err-= dx; y0+=CELLWIDTH; if (y0>=CELLHEIGHT*CELLWIDTH) return;} // stop after cell bottom
   }
 }
 
@@ -935,8 +946,8 @@ draw_cell(int m, int n)
     index_y_t *index_y = trace_index_y[t];
     for (i = i0; i < i1; i++) {
       int x1 = index_x[i  ] - x0;
-      int y1 = index_y[i  ] - y0;
       int x2 = index_x[i+1] - x0;
+      int y1 = index_y[i  ] - y0;
       int y2 = index_y[i+1] - y0;
       cell_drawline(x1, y1, x2, y2, c);
     }
@@ -1039,12 +1050,14 @@ draw_all_cells(bool flush_markmap)
 void
 draw_all(bool flush)
 {
-  if (redraw_request & REDRAW_AREA)
+  if (redraw_request & REDRAW_AREA)       // this set all area for update
     force_set_markmap();
-  if (redraw_request & REDRAW_MARKER)
-    markmap_upperarea();
-  if (redraw_request & REDRAW_TRIGGER)
-    markmap_trigger_area();
+  else {
+    if (redraw_request & REDRAW_MARKER)   // update marker area
+      markmap_upperarea();
+    if (redraw_request & REDRAW_TRIGGER)  // update trigger area
+      markmap_trigger_area();
+  }
   if (redraw_request & (REDRAW_CELLS | REDRAW_MARKER | REDRAW_AREA | REDRAW_TRIGGER)){
     draw_all_cells(flush);
 #ifdef __SCROLL__
