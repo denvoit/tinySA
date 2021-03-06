@@ -2116,13 +2116,18 @@ static const menuitem_t menu_top[] = {
 
 #define ACTIVE_COLOR RGBHEX(0x007FFF)
 
-int menu_is_form(const menuitem_t *menu)
+static bool menu_is_form(const menuitem_t *menu)
 {
+#if 1
+  // Not good set only one item as form and others as normal
+  return menu[0].type & MT_FORM;
+#else
   int i;
   for (i = 0; MT_MASK(menu[i].type) != MT_NONE; i++)
     if (menu[i].type & MT_FORM)
       return (true);
   return(false);
+#endif
 }
 
 static void menu_item_modify_attribute(

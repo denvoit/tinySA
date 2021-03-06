@@ -1313,6 +1313,9 @@ menu_move_back(bool leave_ui)
   if (menu_current_level == 0)
     return;
   erase_menu_buttons();
+  if ( menu_is_form(menu_stack[menu_current_level  ]) &&
+      !menu_is_form(menu_stack[menu_current_level-1]))
+    redraw_request|=REDRAW_AREA|REDRAW_BATTERY|REDRAW_FREQUENCY|REDRAW_CAL_STATUS; // redraw all if switch from form to normal menu mode
   menu_current_level--;
   selection = -1;
 
