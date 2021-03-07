@@ -109,14 +109,21 @@ extern int SI4432_offset_delay;
 #define SI4432_FIFO                        0x7F
 
 
-extern volatile int SI4432_Sel;         // currently selected SI4432
+extern  uint16_t SI4432_Sel;         // currently selected SI4432
 
 extern int SI4432_frequency_changed;
 extern int SI4432_offset_changed;
 
-void SI4432_Write_Byte(uint8_t ADR, uint8_t DATA );
-void SI4432_Write_2_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2);
-uint8_t SI4432_Read_Byte( uint8_t ADR );
+void SI4432_shiftOutDword(uint32_t buf, uint16_t size);
+#define SI4432_Write_Byte(ADR, DATA)                  {uint32_t temp = (((ADR|0x80)&0xFF)<<0)|(((DATA )&0xFF)<<8); SI4432_shiftOutDword(temp, 2);}
+#define SI4432_Write_2_Byte(ADR, DATA1, DATA2)        {uint32_t temp = (((ADR|0x80)&0xFF)<<0)|(((DATA1)&0xFF)<<8)|(((DATA2)&0xFF)<<16);SI4432_shiftOutDword(temp, 3);}
+#define SI4432_Write_3_Byte(ADR, DATA1, DATA2, DATA3) {uint32_t temp = (((ADR|0x80)&0xFF)<<0)|(((DATA1)&0xFF)<<8)|(((DATA2)&0xFF)<<16)|(((DATA3)&0xFF)<<24);SI4432_shiftOutDword(temp, 4);}
+
+//void SI4432_Write_Byte(uint8_t ADR, uint8_t DATA);
+//void SI4432_Write_2_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2);
+//void SI4432_Write_3_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2, uint8_t DATA3 );
+
+uint8_t SI4432_Read_Byte(uint8_t ADR);
 
 void SI4432_Transmit(int d);
 void SI4432_Receive(void);

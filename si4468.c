@@ -483,7 +483,7 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
   } else {
 #endif
 #if 0       // Do not use multi byte write
-    SI4432_Write_Byte ( 0x75, Freq_Band );                          // Freq band must be written first !!!!!!!!!!!!
+    SI4432_Write_Byte(SI4432_FREQBAND, Freq_Band);                          // Freq band must be written first !!!!!!!!!!!!
     SI4432_Write_Byte(SI4432_FREQCARRIER_H, (Carrier>>8) & 0xFF );
     SI4432_Write_Byte(SI4432_FREQCARRIER_L, Carrier & 0xFF  );
 #else
