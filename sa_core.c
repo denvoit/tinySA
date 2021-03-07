@@ -995,10 +995,11 @@ void auto_set_AGC_LNA(int auto_set, int agc)                                    
     v = 0x60; // Enable AGC and disable LNA
   else
     v = 0x40+agc; // Disable AGC and enable LNA
-  if (SI4432_old_v[MODE_SELECT(setting.mode)] != v) {
+  int idx = MODE_SELECT(setting.mode) == SI4432_RX ? 0 : 1;
+  if (SI4432_old_v[idx] != v) {
     SI4432_Sel = MODE_SELECT(setting.mode);
     SI4432_Write_Byte(SI4432_AGC_OVERRIDE, v);
-    SI4432_old_v[MODE_SELECT(setting.mode)] = v;
+    SI4432_old_v[idx] = v;
   }
 #ifdef __SI4463__
   unsigned char v;
@@ -1021,7 +1022,8 @@ void set_AGC_LNA(void) {
   if (S_STATE(setting.agc)) v |= 0x20;
   if (S_STATE(setting.lna)) v |= 0x10;
   SI4432_Write_Byte(SI4432_AGC_OVERRIDE, v);
-  SI4432_old_v[MODE_SELECT(setting.mode)] = v;
+  int idx = MODE_SELECT(setting.mode) == SI4432_RX ? 0 : 1;
+  SI4432_old_v[idx] = v;
 }
 #endif
 
@@ -1226,7 +1228,60 @@ void set_fast_speedup(int s)
   dirty = true;
 }
 
-void calculate_step_delay(void)
+//
+// Table for auto set sweep step/offset delays from RBW
+//
+#ifdef __SI4432__
+static const struct {
+  uint16_t rbw_x10;
+  uint16_t step_delay;
+  uint32_t offset_delay;
+} step_delay_table[]={
+#if 1
+//  RBWx10 step_delay  offset_delay
+  {  1910,       300,         100},
+  {  1420,       350,         100},
+  {   750,       450,         100},
+  {   560,       650,         100},
+  {   370,       700,         200},
+  {   180,      1100,         300},
+  {    90,      1700,         400},
+  {    50,      3300,         800},
+  {     0,      6400,        1600},
+#else
+  {  1910,       280,         100},
+  {  1420,       350,         100},
+  {   750,       450,         100},
+  {   560,       650,         100},
+  {   370,       700,         100},
+  {   180,      1100,         200},
+  {    90,      1700,         400},
+  {    50,      3300,         400},
+  {     0,      6400,        1600},
+#endif
+};
+#endif
+
+#ifdef __SI4463__
+static const struct {
+  uint16_t rbw_x10;
+  uint16_t step_delay;
+  uint16_t offset_delay;
+  uint16_t spur_div_1000;
+} step_delay_table[]={
+//  RBWx10 step_delay  offset_delay spur_gate (value divided by 1000)
+  {  6000,        80,           50,      400},
+  {  3000,        80,           50,      200},
+  {  1000,       100,          100,      100},
+  {   300,       400,          120,      100},
+  {   100,       400,          120,      100},
+  {    30,       900,          300,      100},
+  {    10,      3000,          600,      100},
+  {     0,      9000,         3000,      100}
+};
+#endif
+
+static void calculate_step_delay(void)
 {
   if (setting.step_delay_mode == SD_MANUAL || setting.step_delay != 0) {        // The latter part required for selftest 3
     SI4432_step_delay = setting.step_delay;
@@ -1237,38 +1292,19 @@ void calculate_step_delay(void)
     if (setting.frequency_step == 0) {            // zero span mode, not dependent on selected RBW
       SI4432_step_delay = 0;
     } else {
+      // Search index in table depend from RBW
+      uint16_t i=0;
+      for (uint16_t i=0;i<ARRAY_COUNT(step_delay_table)-1;i++)
+        if (actual_rbw_x10 >= step_delay_table[i].rbw_x10)
+          break;
 #ifdef __SI4432__
-#if 1       // Table for double offset delay
-      if (actual_rbw_x10 >= 1910)      { SI4432_step_delay =  300; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 1420) { SI4432_step_delay =  350; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 750)  { SI4432_step_delay =  450; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 560)  { SI4432_step_delay =  650; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 370)  { SI4432_step_delay =  700; SI4432_offset_delay = 200; }
-      else if (actual_rbw_x10 >= 180)  { SI4432_step_delay = 1100; SI4432_offset_delay = 300; }
-      else if (actual_rbw_x10 >=  90)  { SI4432_step_delay = 1700; SI4432_offset_delay = 400; }
-      else if (actual_rbw_x10 >=  50)  { SI4432_step_delay = 3300; SI4432_offset_delay = 800; }
-      else                             { SI4432_step_delay = 6400; SI4432_offset_delay =1600; }
-#else
-      if (actual_rbw_x10 >= 1910)      { SI4432_step_delay =  280; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 1420) { SI4432_step_delay =  350; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 750)  { SI4432_step_delay =  450; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 560)  { SI4432_step_delay =  650; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 370)  { SI4432_step_delay =  700; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 180)  { SI4432_step_delay = 1100; SI4432_offset_delay = 200; }
-      else if (actual_rbw_x10 >=  90)  { SI4432_step_delay = 1700; SI4432_offset_delay = 400; }
-      else if (actual_rbw_x10 >=  50)  { SI4432_step_delay = 3300; SI4432_offset_delay = 400; }
-      else                             { SI4432_step_delay = 6400; SI4432_offset_delay =1600; }
-#endif
+      SI4432_step_delay   = step_delay_table[i].step_delay;
+      SI4432_offset_delay = step_delay_table[i].offset_delay;
 #endif
 #ifdef __SI4463__
-      if      (actual_rbw_x10 >= 6000) { SI4432_step_delay = 80; SI4432_offset_delay = 50; spur_gate = 400000; }
-      else if (actual_rbw_x10 >= 3000) { SI4432_step_delay = 80; SI4432_offset_delay = 50; spur_gate = 200000; }
-      else if (actual_rbw_x10 >= 1000) { SI4432_step_delay = 100; SI4432_offset_delay = 100; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 300)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 100)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 30)   { SI4432_step_delay = 900; SI4432_offset_delay = 300; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 10)   { SI4432_step_delay = 3000; SI4432_offset_delay = 600; spur_gate = 100000; }
-      else                             { SI4432_step_delay = 9000; SI4432_offset_delay =3000; spur_gate = 100000; }
+      SI4432_step_delay   = step_delay_table[i].step_delay;
+      SI4432_offset_delay = step_delay_table[i].offset_delay;
+      spur_gate           = step_delay_table[i].spur_div_1000 * 1000;
 #endif
       if (setting.step_delay_mode == SD_PRECISE)    // In precise mode wait twice as long for RSSI to stabilize
         SI4432_step_delay += (SI4432_step_delay>>2) ;
@@ -1280,7 +1316,7 @@ void calculate_step_delay(void)
   }
 }
 
-void apply_settings(void)       // Ensure all settings in the setting structure are translated to the right HW setup
+static void apply_settings(void)       // Ensure all settings in the setting structure are translated to the right HW setup
 {
   set_switches(setting.mode);
 #ifdef __PE4302__
@@ -1320,7 +1356,7 @@ static const float correction_value[CORRECTION_POINTS] =
 static int32_t scaled_correction_multi[CORRECTION_POINTS];
 static int32_t scaled_correction_value[CORRECTION_POINTS];
 
-void calculate_correction(void)
+static void calculate_correction(void)
 {
   scaled_correction_value[0] = setting.correction_value[0]  * (1 << (SCALE_FACTOR));
   for (int i = 1; i < CORRECTION_POINTS; i++) {
