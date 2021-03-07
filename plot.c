@@ -939,11 +939,12 @@ draw_cell(int m, int n)
 #endif
 // Draw trigger line
   if (setting.trigger != T_AUTO) {
+	c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
     int tp = get_trigger_level() - y0;
     if (tp>=0 && tp < h)
       for (x = 0; x < w; x++)
         if ((uint32_t)(x + x0 - CELLOFFSETX) <= WIDTH + CELLOFFSETX)
-          cell_buffer[tp * CELLWIDTH + x] = LCD_TRIGGER_COLOR;
+          cell_buffer[tp * CELLWIDTH + x] = c;
   }
 
 #if 1
