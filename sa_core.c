@@ -91,22 +91,21 @@ const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0
 //#define SL_GENHIGH_LEVEL_RANGE    9
 
 #define SL_GENHIGH_LEVEL_MIN    drive_dBm[MIN_DRIVE]
-#define SL_GENHIGH_LEVEL_RANGE  (drive_dBm[MAX_DRIVE] - drive_dBm[MIN_DRIVE])
 #define SL_GENHIGH_LEVEL_MAX    drive_dBm[MAX_DRIVE]
 
 #define SL_GENLOW_LEVEL_MIN    -104
-#define SL_GENLOW_LEVEL_RANGE   90
+#define SL_GENLOW_LEVEL_MAX   -14
 
 
 #else
-#define SWITCH_ATTENUATION  (30 - config.switch_offset)
+#define SWITCH_ATTENUATION  (29 - config.switch_offset)
 #define POWER_OFFSET    15
 #define MAX_DRIVE   (setting.mode == M_GENHIGH ? 15 : 11)
 #define MIN_DRIVE   8
 #define SL_GENHIGH_LEVEL_MIN    -38
-#define SL_GENHIGH_LEVEL_RANGE    54
+#define SL_GENHIGH_LEVEL_MAX    16
 #define SL_GENLOW_LEVEL_MIN    -76
-#define SL_GENLOW_LEVEL_RANGE   70
+#define SL_GENLOW_LEVEL_MAX   -7
 #endif
 
 #define BELOW_MAX_DRIVE(X) (drive_dBm[X] - drive_dBm[MAX_DRIVE])
@@ -635,26 +634,23 @@ float level_min(void)
 float level_max(void)
 {
   if (setting.mode == M_GENLOW)
-    return SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE + config.low_level_output_offset;
+    return SL_GENLOW_LEVEL_MAX + config.low_level_output_offset;
   else
-    return SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE + config.high_level_output_offset;
+    return SL_GENHIGH_LEVEL_MAX + config.high_level_output_offset;
 }
 
 float level_range(void)
 {
   int r;
-  if (setting.mode == M_GENLOW)
-    r = SL_GENLOW_LEVEL_RANGE ;
-  else
-    r = SL_GENHIGH_LEVEL_RANGE;
+  r = level_max() - level_min();
   return r;
 }
 
 static pureRSSI_t get_signal_path_loss(void){
 #ifdef TINYSA4
   if (setting.mode == M_LOW)
-    return float_TO_PURE_RSSI(-4);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
-  return float_TO_PURE_RSSI(+19);          // Loss in dB (+ is gain)
+    return float_TO_PURE_RSSI(+3);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
+  return float_TO_PURE_RSSI(+29);          // Loss in dB (+ is gain)
 #else
   if (setting.mode == M_LOW)
     return float_TO_PURE_RSSI(-5.5);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
@@ -668,8 +664,8 @@ void set_level(float v)     // Set the output level in dB  in high/low output
     v -= config.high_level_output_offset;
     if (v < SL_GENHIGH_LEVEL_MIN)
       v = SL_GENHIGH_LEVEL_MIN;
-    if (v > SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE)
-      v = SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE;
+    if (v > SL_GENHIGH_LEVEL_MAX)
+      v = SL_GENHIGH_LEVEL_MAX;
     v += config.high_level_output_offset;
 #if 0
     unsigned int d = MIN_DRIVE;
@@ -685,8 +681,8 @@ void set_level(float v)     // Set the output level in dB  in high/low output
     v -= config.low_level_output_offset;
     if (v < SL_GENLOW_LEVEL_MIN)
       v = SL_GENLOW_LEVEL_MIN;
-    if (v > SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE)
-      v = SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE;
+    if (v > SL_GENLOW_LEVEL_MAX)
+      v = SL_GENLOW_LEVEL_MAX;
     v += config.low_level_output_offset;
 //    set_attenuation(setting.level - config.low_level_output_offset);
   }
@@ -2308,14 +2304,41 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       }
     }
     else if (setting.mode == M_GENHIGH) {
+      float a = setting.level - level_max();
+      if (a <= -SWITCH_ATTENUATION) {
+        setting.atten_step = true;
+        a = a + SWITCH_ATTENUATION;
+#ifdef TINYSA3
+        SI4432_Sel = SI4432_LO ;
+        set_switch_receive();
+#else
+        enable_rx_output(false);
+#endif
+      } else {
+        setting.atten_step = false;
+#ifdef TINYSA3
+        SI4432_Sel = SI4432_LO ;
+        set_switch_transmit();
+#else
+        enable_rx_output(true);
+#endif
+      }
+
       unsigned int d = MIN_DRIVE;
-      float v = setting.level - config.high_level_output_offset;
-      while (drive_dBm[d] < v && d < MAX_DRIVE)       // Find level equal or above requested level
+      while (drive_dBm[d] - level_max() < a && d < MAX_DRIVE)       // Find level equal or above requested level
         d++;
       //    if (d == 8 && v < -12)  // Round towards closest level
       //      d = 7;
-      setting.level = drive_dBm[d] + config.high_level_output_offset;
-      set_lo_drive(d);
+      setting.level = drive_dBm[d] + config.high_level_output_offset - (setting.atten_step ? SWITCH_ATTENUATION : 0);
+
+#ifdef __SI4432__
+        SI4432_Sel = SI4432_LO ;
+        SI4432_Drive(d);
+#endif
+#ifdef __SI4463__
+        SI4463_set_output_level(d);
+#endif
+
     }
   }
 #ifdef __SI4432__
