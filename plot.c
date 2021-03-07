@@ -284,16 +284,6 @@ draw_on_strut(int v0, int d, int color)
 }
 #endif
 
-#define SQRT_50 ((float)7.0710678118654)                   // sqrt(50.0)
-#define LOG_10_SQRT_50 ((float)0.84948500216800)           // log10(sqrt(50.0))
-#define POW_SQRT    ((float)0.2236067950725555419921875)   // pow(10, -30.0/20.0) * sqrt(50.0)
-#define LOG_10_SQRT_50_x20_plus30 ((float)46.98970004336)  // 30.0 - 20.0*log10(sqrt(50.0))
-#define LOG_10_SQRT_50_x20_plus90 ((float)106.98970004336) // 90.0 - 20.0*log10(sqrt(50.0))
-#define LOG_DIV_10     ((float)0.2302585093)               // multiplier = log(10.0)/10.0
-#define LOG_DIV_20     ((float)0.11512925465)              // multiplier = log(10.0)/20.0
-#define DIV_LOG10_x20  ((float)8.6858896380650)            // multiplier = 20.0 / log(10)
-#define DIV_LOG10_x10  ((float)4.3429448190325)            // multiplier = 10.0 / log(10)
-
 /*
  * calculate log10f(abs(gamma))
  */ 
@@ -303,24 +293,25 @@ index_to_value(const int i)
   return(value(actual_t[i]));
 }
 
+// Function for convert to different type of values from dBm
+// Replaced some equal functions and use recalculated constants:
+// powf(10,x) =  expf(x * logf(10))
+// log10f(x)  =  logf(x)/logf(10)
 float
 value(const float v)
 {
   switch(setting.unit)
   {
   case U_DBMV:
-//  return v + 30.0 + 20.0*log10f(sqrtf(50));
-    return v + LOG_10_SQRT_50_x20_plus30; // + 30.0 + 20.0*LOG_10_SQRT_50;
+    return v + (30.0 + 20.0*log10f(sqrtf(50.0)));
   case U_DBUV:
-//  return v + 90.0 + 20.0*log10f(sqrtf(50.0));
-    return v + LOG_10_SQRT_50_x20_plus90; // 90.0 + 20.0*LOG_10_SQRT_50;
+    return v + (90.0 + 20.0*log10f(sqrtf(50.0)));
   case U_VOLT:
-//    return powf(10.0, (v-30.0)/20.0) * sqrtf(50.0);
-//    return powf(10.0, (v-30.0)/20.0) * SQRT_50;  // powf(10.0,v/20.0) * powf(10, -30.0/20.0) * sqrtf(50)
-    return expf(v*LOG_DIV_20) * POW_SQRT;          // expf(v*logf(10.0)/20.0) * powf(10, -30.0/20.0) * sqrtf(50)
+//  return powf(10.0, (v-30.0)/20.0) * sqrtf(50.0);                     // powf(10.0, v           /20.0) * powf(10, -30.0/20.0) * sqrtf(50)
+    return expf(v*(logf(10.0)/20.0)) * (powf(10, -30.0/20.0)*sqrtf(50));//       expf(v*logf(10.0)/20.0) * powf(10, -30.0/20.0) * sqrtf(50)
   case U_WATT:
-//    return powf(10.0, v/10.0)/1000.0;            // powf(10, v/10.0)/1000.0 = expf(v*logf(10.0)/10.0)/1000.0
-    return expf(v*LOG_DIV_10) / 1000.0;            //
+//    return powf(10.0, v/10.0)/1000.0;               // powf(10.0, v           /10.0) / 1000.0
+    return expf(v*(logf(10.0)/10.0)) / 1000.0;        //       expf(v*logf(10.0)/10.0) / 1000.0
   }
 //  case U_DBM:
     return v;  // raw data is in logmag*10 format
@@ -332,18 +323,15 @@ to_dBm(const float v)
   switch(setting.unit)
   {
   case U_DBMV:
-//  return v - 30.0 - 20.0*log10f(sqrtf(50));
-    return v - LOG_10_SQRT_50_x20_plus30; // (30.0 + 20.0*LOG_10_SQRT_50);
+    return v - (30.0 - 20.0*log10f(sqrtf(50.0)));
   case U_DBUV:
-//  return v - 90.0 - 20.0*log10f(sqrtf(50.0));     //TODO convert constants to single float number as GCC compiler does runtime calculation
-    return v - LOG_10_SQRT_50_x20_plus90; // (90.0 + 20.0*LOG_10_SQRT_50);
+    return v - (90.0 - 20.0*log10f(sqrtf(50.0)));
   case U_VOLT:
-//  return log10f( v / (sqrtf(50.0))) * 20.0 + 30.0;
-//  return log10f( v / SQRT_50) * 20.0 + 30.0;
-    return logf(v / SQRT_50) * DIV_LOG10_x20 + 30.0; // logf(v / SQRT_50) * 20.0 / logf(10) + 30.0
+//  return log10f(v/(sqrtf(50.0)))* 20.0             + 30.0;
+    return   logf(v/(sqrtf(50.0)))*(20.0/logf(10.0)) + 30.0;
   case U_WATT:
-//  return log10f(v*1000.0)*10.0;
-    return logf(v*1000.0) * DIV_LOG10_x10;           // logf(v*1000.0) * 10.0 / logf(10)
+//  return log10f(v*1000.0)* 10.0;
+    return   logf(v*1000.0)*(10.0/logf(10.0));
   }
 //  case U_DBM:
     return v;  // raw data is in logmag*10 format
@@ -374,10 +362,10 @@ trace_into_index_y_array(index_y_t *y, float *array, int points)
   float ref_shift = 0;
   switch (setting.unit){
     case U_DBM: break;
-    case U_DBMV: ref_shift = LOG_10_SQRT_50_x20_plus30;break;
-    case U_DBUV: ref_shift = LOG_10_SQRT_50_x20_plus90;break;
-    case U_VOLT: vmult = POW_SQRT; mult = LOG_DIV_20;break;
-    case U_WATT: vmult = 0.001;    mult = LOG_DIV_10;break;
+    case U_DBMV: ref_shift = 30.0 - 20.0*log10f(sqrtf(50.0));break;
+    case U_DBUV: ref_shift = 90.0 - 20.0*log10f(sqrtf(50.0));break;
+    case U_VOLT: vmult = powf(10, -30.0/20.0) * sqrtf(50.0); mult = logf(10.0)/20.0;break;
+    case U_WATT: vmult = 1.0/1000.0;                         mult = logf(10.0)/10.0;break;
     default:
     return;
   }
@@ -470,8 +458,8 @@ void trace_get_value_string(     // Only used at one place
 #endif
     v = value(coeff[i]);
     if (mtype & M_NOISE){
-//      v-= log10f(actual_rbw_x10*100.0) * 10.0;
-    	v-= logf(actual_rbw_x10*100.0) * DIV_LOG10_x10;
+//    v-= log10f(actual_rbw_x10*100.0) *  10.0;
+      v-=   logf(actual_rbw_x10*100.0) * (10.0/logf(10.0));
     }
     if (v == -INFINITY)
       plot_printf(buf, len, "-INF");
@@ -1329,8 +1317,8 @@ static void cell_draw_marker_info(int x0, int y0)
         float level = (actual_t[markers[1].index] + actual_t[markers[2].index])/2.0 -  actual_t[markers[0].index];
         if (level < -70 || level > 0)
           break;
-//      int depth =(int) (powf((float)10.0, 2.0 + (level + 6.02) /20.0));
-        int depth = expf((2.0 + (level + 6.02))*LOG_DIV_20);
+//      int depth = powf(10.0, 2.0 + (level + 6.02)             /20.0 );
+        int depth =      expf((2.0 + (level + 6.02))*(logf(10.0)/20.0));
 #endif
         plot_printf(buf, sizeof buf, "DEPTH: %3d%%", depth);
         goto show_computed;
