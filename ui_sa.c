@@ -800,7 +800,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_spur_acb)
     } else {
       b->param_1.text = "MIRROR\nMASKING";
 #ifdef TINYSA4
-      b->icon = AUTO_ICON(setting.mirror_masking);  // mirror_masking does not yet have an auto mode so this is never an auto icon
+      b->icon = AUTO_ICON(setting.mirror_masking ? 1 : 0);  // mirror_masking does not yet have an auto mode so this is never an auto icon
 #else
       b->icon = setting.mirror_masking == 0 ? BUTTON_ICON_NOCHECK : BUTTON_ICON_CHECK;
 #endif
