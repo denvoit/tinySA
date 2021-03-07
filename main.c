@@ -184,13 +184,11 @@ static THD_FUNCTION(Thread1, arg)
     // Process collected data, calculate trace coordinates and plot only if scan
     // completed
     if (/* sweep_mode & SWEEP_ENABLE && */ completed) {
-#ifdef __VNA__
-      if ((domain_mode & DOMAIN_MODE) == DOMAIN_TIME) transform_domain();
-#endif	  
+//      START_PROFILE;
       // Prepare draw graphics, cache all lines, mark screen cells for redraw
       plot_into_index(measured);
       redraw_request |= REDRAW_CELLS | REDRAW_BATTERY;
-
+//      STOP_PROFILE;
       if (uistat.marker_tracking) {
         int i = marker_search_max();
         if (i != -1 && active_marker != MARKER_INVALID) {
@@ -891,8 +889,8 @@ VNA_SHELL_FUNCTION(cmd_capture)
   for (y = 0; y < LCD_HEIGHT; y += 2) {
     // use uint16_t spi_buffer[2048] (defined in ili9341) for read buffer
     uint8_t *buf = (uint8_t *)spi_buffer;
-    ili9341_read_memory(0, y, LCD_WIDTH, 2, 2 * LCD_WIDTH, spi_buffer);
-    streamWrite(shell_stream, (void*)buf, 2 * 2 * LCD_WIDTH);
+    ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
+    streamWrite(shell_stream, (void*)buf, 2 * LCD_WIDTH * sizeof(uint16_t));
   }
 }
 

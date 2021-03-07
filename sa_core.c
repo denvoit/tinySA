@@ -918,7 +918,7 @@ void set_harmonic(int h)
 void set_step_delay(int d)                  // override RSSI measurement delay or set to one of three auto modes
 {
 
-  if ((3 <= d && d < 100) || d > 30000)         // values 0 (normal scan), 1 (precise scan) and 2(fast scan) have special meaning and are auto calculated
+  if ((3 <= d && d < 10) || d > 30000)         // values 0 (normal scan), 1 (precise scan) and 2(fast scan) have special meaning and are auto calculated
     return;
   if (d <3) {
     setting.step_delay_mode = d;
@@ -1265,9 +1265,9 @@ void calculate_step_delay(void)
 #endif
 #endif
 #ifdef __SI4463__
-      if      (actual_rbw_x10 >= 6000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 400000; }
-      else if (actual_rbw_x10 >= 3000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 200000; }
-      else if (actual_rbw_x10 >= 1000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 100000; }
+      if      (actual_rbw_x10 >= 6000) { SI4432_step_delay = 80; SI4432_offset_delay = 50; spur_gate = 400000; }
+      else if (actual_rbw_x10 >= 3000) { SI4432_step_delay = 80; SI4432_offset_delay = 50; spur_gate = 200000; }
+      else if (actual_rbw_x10 >= 1000) { SI4432_step_delay = 100; SI4432_offset_delay = 100; spur_gate = 100000; }
       else if (actual_rbw_x10 >= 300)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
       else if (actual_rbw_x10 >= 100)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
       else if (actual_rbw_x10 >= 30)   { SI4432_step_delay = 900; SI4432_offset_delay = 300; spur_gate = 100000; }
@@ -2579,19 +2579,25 @@ modulation_again:
 #define TXCO_DIV3   10000000
 
         if (setting.R == 0) {
-          if (lf < LOW_MAX_FREQ && lf >= TXCO_DIV3) {
+          if (lf < LOW_MAX_FREQ && lf >= TXCO_DIV3 && MODE_INPUT(setting.mode)) {
             freq_t tf = ((lf + actual_rbw_x10*100) / TCXO) * TCXO;
             if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100) {
               ADF4351_R_counter(6);
             } else {
-              freq_t tf = ((lf + actual_rbw_x10*100) / TXCO_DIV3) * TXCO_DIV3;
-              if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100)
-                ADF4351_R_counter(4);
-              else
-                ADF4351_R_counter(3);
+              if (setting.frequency_step < 100000) {
+                freq_t tf = ((lf + actual_rbw_x10*100) / TXCO_DIV3) * TXCO_DIV3;
+                if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100)
+                  ADF4351_R_counter(4);
+                else
+                  ADF4351_R_counter(3);
+              } else
+                ADF4351_R_counter(1);
             }
           } else
-            ADF4351_R_counter(3);
+            if (setting.frequency_step < 100000)
+              ADF4351_R_counter(3);
+            else
+              ADF4351_R_counter(1);
         }
         else
           ADF4351_R_counter(setting.R);
@@ -4360,6 +4366,8 @@ void self_test(int test)
       setting.repeat = 20;
 #endif
       setting.step_delay = setting.step_delay * 5 / 4;
+      if (setting.step_delay < 1000)
+        setting.step_delay = 1000;
       setting.offset_delay = setting.step_delay ;
       setting.rbw_x10 = force_rbw(j);
 

@@ -711,7 +711,7 @@ extern volatile uint8_t redraw_request;
 // Set display buffers count for cell render (if use 2 and DMA, possible send data and prepare new in some time)
 
 #ifdef __USE_DISPLAY_DMA__
-// Cell size = sizeof(spi_buffer), but need wait while cell cata send to LCD
+// Cell size = sizeof(spi_buffer), but need wait while cell data send to LCD
 //#define DISPLAY_CELL_BUFFER_COUNT     1
 // Cell size = sizeof(spi_buffer)/2, while one cell send to LCD by DMA, CPU render to next cell
 #define DISPLAY_CELL_BUFFER_COUNT     2
@@ -727,7 +727,7 @@ typedef uint16_t pixel_t;
 #define CELLHEIGHT (32)
 
 // Define size of screen buffer in pixels (one pixel 16bit size)
-#define SPI_BUFFER_SIZE             (CELLWIDTH*CELLHEIGHT*DISPLAY_CELL_BUFFER_COUNT)
+#define SPI_BUFFER_SIZE     (CELLWIDTH * CELLHEIGHT * DISPLAY_CELL_BUFFER_COUNT)
 
 // SPI bus revert byte order
 // 16-bit gggBBBbb RRRrrGGG
@@ -735,11 +735,13 @@ typedef uint16_t pixel_t;
 #define RGBHEX(hex) ( (((hex)&0x001c00)<<3) | (((hex)&0x0000f8)<<5) | (((hex)&0xf80000)>>16) | (((hex)&0x00e000)>>13) )
 #define HEXRGB(hex) ( (((hex)>>3)&0x001c00) | (((hex)>>5)&0x0000f8) | (((hex)<<16)&0xf80000) | (((hex)<<13)&0x00e000) )
 
-
+// Define LCD display driver and screen size
 #ifdef TINYSA4
+#define LCD_DRIVER_ST7796S
 #define LCD_WIDTH                   480
 #define LCD_HEIGHT                  320
 #else
+#define LCD_DRIVER_ILI9341
 #define LCD_WIDTH                   320
 #define LCD_HEIGHT                  240
 #endif
@@ -813,7 +815,7 @@ typedef uint16_t pixel_t;
 extern uint16_t foreground_color;
 extern uint16_t background_color;
 
-extern uint16_t spi_buffer[SPI_BUFFER_SIZE];
+extern pixel_t spi_buffer[SPI_BUFFER_SIZE];
 
 // Used for easy define big Bitmap as 0bXXXXXXXXX image
 #define _BMP8(d)                                                        ((d)&0xFF)
@@ -824,16 +826,24 @@ extern uint16_t spi_buffer[SPI_BUFFER_SIZE];
 void ili9341_init(void);
 void ili9341_test(int mode);
 void ili9341_bulk(int x, int y, int w, int h);              // send data to display, in DMA mode use it, but wait DMA complete
+void ili9341_fill(int x, int y, int w, int h);
+
+// Double buffer mode parser
+#if DISPLAY_CELL_BUFFER_COUNT == 1
+#define ili9341_get_cell_buffer()             spi_buffer
+#define ili9341_bulk_continue                 ili9341_bulk
+#define ili9341_bulk_finish()                 {}
+#else
+pixel_t *ili9341_get_cell_buffer(void);                     // get buffer for cell render
 void ili9341_bulk_continue(int x, int y, int w, int h);     // send data to display, in DMA mode use it, no wait DMA complete
 void ili9341_bulk_finish(void);                             // wait DMA complete (need call at end)
-void ili9341_fill(int x, int y, int w, int h);
-pixel_t *ili9341_get_cell_buffer(void);                     // get buffer for cell render
+#endif
 
 void ili9341_set_foreground(uint16_t fg_idx);
 void ili9341_set_background(uint16_t bg_idx);
 
 void ili9341_clear_screen(void);
-void ili9341_blitBitmap(uint16_t x, uint16_t y, uint16_t width, uint16_t height, const uint8_t *bitmap);
+void ili9341_blitBitmap(int x, int y, int width, int height, const uint8_t *bitmap);
 void ili9341_drawchar(uint8_t ch, int x, int y);
 void ili9341_drawstring(const char *str, int x, int y);
 void ili9341_drawstring_7x13(const char *str, int x, int y);
@@ -842,7 +852,7 @@ void ili9341_drawstringV(const char *str, int x, int y);
 int  ili9341_drawchar_size(uint8_t ch, int x, int y, uint8_t size);
 void ili9341_drawstring_size(const char *str, int x, int y, uint8_t size);
 void ili9341_drawfont(uint8_t ch, int x, int y);
-void ili9341_read_memory(int x, int y, int w, int h, int len, pixel_t* out);
+void ili9341_read_memory(int x, int y, int w, int h, uint16_t* out);
 void ili9341_line(int x0, int y0, int x1, int y1);
 void show_version(void);
 
