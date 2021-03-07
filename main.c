@@ -122,7 +122,7 @@ const char *info_about[]={
   0 // sentinel
 };
 
-uint16_t dirty = true;
+bool dirty = true;
 
 bool completed = false;
 

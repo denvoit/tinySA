@@ -589,7 +589,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_store_preset_acb)
 }
 
 
-extern int dirty;
+extern bool dirty;
 UI_FUNCTION_CALLBACK(menu_autosettings_cb)
 {
   (void)item;
