@@ -4206,8 +4206,7 @@ common_silent:
   draw_cal_status();
 }
 
-extern void menu_autosettings_cb(int item);
-
+extern void menu_autosettings_cb(int item, uint16_t data);
 
 int last_spur = 0;
 int add_spur(int f)
@@ -4240,7 +4239,7 @@ void self_test(int test)
     }
     reset_settings(M_LOW);                      // Make sure we are in a defined state
     in_selftest = true;
-    menu_autosettings_cb(0);
+    menu_autosettings_cb(0, 0);
     for (uint16_t i=0; i < TEST_COUNT; i++) {          // All test cases waiting
       if (test_case[i].kind == TC_END)
         break;
