@@ -35,7 +35,7 @@
 #endif
 #endif
 // uint8_t dirty = true;
-int scandirty = true;
+uint8_t scandirty = true;
 
 setting_t setting;
 freq_t frequencies[POINTS_COUNT];
@@ -1064,7 +1064,7 @@ void set_unit(int u)
     if (S_IS_AUTO(setting.lna))
       setting.lna = S_AUTO_OFF;
   } else {
-    r = 10 * round((r*1.2)/10.0);
+    r = 10 * roundf((r*1.2)/10.0);
     set_reflevel(r);
     set_scale(10);
     if (S_IS_AUTO(setting.agc))
