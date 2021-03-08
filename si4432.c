@@ -1129,7 +1129,7 @@ void ADF4351_prep_frequency(int channel, unsigned long freq, int drive)  // freq
     MOD = (PFDRFout[channel] / OutputChannelSpacing) + 0.01;
 //    MOD = 3125;
     FRACF = (((RFout * OutputDivider) / PFDRFout[channel]) - INTA) * MOD;
-    FRAC = round(FRACF);
+    FRAC = roundf(FRACF);
 
   while (FRAC > 4095 || MOD > 4095) {
     FRAC = FRAC >> 1;

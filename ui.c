@@ -1894,7 +1894,7 @@ draw_menu_buttons(const menuitem_t *menu)
           }
           goto draw_divider;
         } else if (menu[i].data == KM_LOWOUTLEVEL) {
-          local_slider_positions = ((get_level() - level_min()) * (MENU_FORM_WIDTH-8)) / level_range() + OFFSETX+4;
+          local_slider_positions = ((get_level() - level_min) * (MENU_FORM_WIDTH-8)) / level_range + OFFSETX+4;
           for (int i=0; i <= 4; i++) {
             ili9341_drawstring(step_text[i], button_start+12 + i * MENU_FORM_WIDTH/5, y+button_height-9);
           }
@@ -1907,7 +1907,7 @@ draw_menu_buttons(const menuitem_t *menu)
             local_slider_positions = button_start;
           ili9341_blitBitmap(local_slider_positions - 4, y, 7, 5, slider_bitmap);
         } else if (menu[i].data == KM_HIGHOUTLEVEL) {
-          local_slider_positions = ((get_level() - level_min() ) * (MENU_FORM_WIDTH-8)) / level_range() + OFFSETX+4;
+          local_slider_positions = ((get_level() - level_min ) * (MENU_FORM_WIDTH-8)) / level_range + OFFSETX+4;
           goto draw_slider;
         }
       }
@@ -2072,7 +2072,7 @@ menu_select_touch(int i, int pos)
               check_frequency_slider(slider_freq);
          }
         } else if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_LOWOUTLEVEL) {
-            uistat.value =  setting.offset + ((touch_x - OFFSETX+4) * level_range() ) / (MENU_FORM_WIDTH-8) + level_min() ;
+            uistat.value =  setting.offset + ((touch_x - OFFSETX+4) * level_range ) / (MENU_FORM_WIDTH-8) + level_min ;
          apply_step:
             set_keypad_value(keypad);
          apply:
@@ -2081,7 +2081,7 @@ menu_select_touch(int i, int pos)
 //          }
 //        } else if (MT_MASK(menu[i].type) == MT_ADV_CALLBACK && menu[i].reference == menu_sdrive_acb) {
         } else if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_HIGHOUTLEVEL) {
-            set_level( (touch_x - OFFSETX+4) *(level_range()) / (MENU_FORM_WIDTH-8) + level_min() );
+            set_level( (touch_x - OFFSETX+4) *(level_range) / (MENU_FORM_WIDTH-8) + level_min );
             goto apply;
         }
         keypad_mode = old_keypad_mode;

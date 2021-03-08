@@ -328,6 +328,16 @@ VNA_SHELL_FUNCTION(cmd_if)
   }
 }
 
+VNA_SHELL_FUNCTION(cmd_zero)
+{
+  if (argc != 1) {
+    shell_printf("usage: zero {level}\r\n%ddBm\r\n", config.ext_zero_level);
+    return;
+  } else {
+    config.ext_zero_level = my_atoi(argv[0]);
+  }
+}
+
 #ifdef TINYSA4
 VNA_SHELL_FUNCTION(cmd_ultra_start)
 {
@@ -676,7 +686,7 @@ void sweep_remote(void)
   for (i = 0; i <= step; i++, f+=delta) {
     if (operation_requested)
       break;
-    int val = perform(false, i, f, false) + float_TO_PURE_RSSI(EXT_ZERO_LEVEL);
+    int val = perform(false, i, f, false) + float_TO_PURE_RSSI(config.ext_zero_level);
     streamPut(shell_stream, 'x');
     streamPut(shell_stream, (uint8_t)(val & 0xFF));
     streamPut(shell_stream, (uint8_t)((val>>8) & 0xFF));
@@ -822,7 +832,7 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
   dirty = true;
 
   for (uint32_t i = 0; i<points; i++) {
-    int val = perform(false, i, start +(freq_t)(f_step * i), false) + float_TO_PURE_RSSI(EXT_ZERO_LEVEL);
+    int val = perform(false, i, start +(freq_t)(f_step * i), false) + float_TO_PURE_RSSI(config.ext_zero_level);
     if (operation_requested && SDU1.config->usbp->state != USB_ACTIVE) // break on operation in perform
       break;
     streamPut(shell_stream, 'x');
