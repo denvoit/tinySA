@@ -22,8 +22,8 @@
 
 #define __SI4432_H__
 
-extern int SI4432_step_delay;
-extern int SI4432_offset_delay;
+extern uint32_t SI4432_step_delay;
+extern uint32_t SI4432_offset_delay;
 #ifdef __SI4432__
 
 //
@@ -111,8 +111,8 @@ extern int SI4432_offset_delay;
 
 extern  uint16_t SI4432_Sel;         // currently selected SI4432
 
-extern int SI4432_frequency_changed;
-extern int SI4432_offset_changed;
+extern uint8_t SI4432_frequency_changed;
+extern uint8_t SI4432_offset_changed;
 
 void SI4432_shiftOutDword(uint32_t buf, uint16_t size);
 #define SI4432_Write_Byte(ADR, DATA)                  {uint32_t temp = (((ADR|0x80)&0xFF)<<0)|(((DATA )&0xFF)<<8); SI4432_shiftOutDword(temp, 2);}
@@ -140,7 +140,6 @@ void SI4432_Set_Frequency ( uint32_t Freq );
 
 uint16_t force_rbw(int i);
 uint16_t set_rbw(uint16_t WISH);
-extern const int SI4432_RBW_count;
 void set_calibration_freq(int freq);
 #ifdef __FAST_SWEEP__
 void SI4432_Fill(int s, int start);

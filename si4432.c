@@ -383,8 +383,6 @@ static const RBW_t RBW_choices[] = {
 
 };
 
-const int SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
-
 static pureRSSI_t SI4432_RSSI_correction = float_TO_PURE_RSSI(-120);
 
 uint16_t force_rbw(int i)
@@ -396,22 +394,22 @@ uint16_t force_rbw(int i)
 }
 
 uint16_t set_rbw(uint16_t WISH)  {
-  int i;
-  for (i=0; i < SI4432_RBW_count - 1; i++)
+  uint16_t i;
+  for (i=0; i <ARRAY_COUNT(RBW_choices) - 1; i++)
     if (WISH <= RBW_choices[i].RBWx10) 
       break; 
   return force_rbw(i);
 }
 
 
-int SI4432_frequency_changed = false;
-int SI4432_offset_changed = false;
+uint8_t SI4432_frequency_changed = false;
+uint8_t SI4432_offset_changed = false;
 
 // #define __CACHE_BAND__  // Is not reliable!!!!!!
 
 #ifdef __CACHE_BAND__
-static int old_freq_band[2] = {-1,-1};
-static int written[2]= {0,0};
+static uint8_t old_freq_band[2] = {-1,-1};
+static uint8_t written[2]= {0,0};
 #endif
 
 void SI4432_Set_Frequency ( freq_t Freq ) {
@@ -473,13 +471,13 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
 //    SI4432_Write_Byte( 0x07, 0x0B);
 }
 
-int SI4432_step_delay = 1500;
+uint32_t SI4432_step_delay = 1500;
 //extern int setting.repeat;
 
 #ifdef __FAST_SWEEP__
 extern deviceRSSI_t age[POINTS_COUNT];
-static int buf_index = 0;
-static int buf_end = 0;
+static uint16_t buf_index = 0;
+static uint16_t buf_end = 0;
 static bool  buf_read = false;
 
 #if 0
@@ -513,9 +511,7 @@ void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigg
   systime_t measure = chVTGetSystemTimeX();
   int waiting = ST_ARMING;
 //  __disable_irq();
-  SPI2_CLK_LOW;
   int i = 0;
-
   uint16_t t_mode = up_direction ? T_UP_MASK : T_DOWN_MASK;
   uint16_t data_level = T_LEVEL_UNDEF;
   do {
@@ -523,12 +519,8 @@ void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigg
       return;                                       // abort
     palClearPad(GPIOC, sel);
     shiftOut(SI4432_REG_RSSI);
-    // Store data level bitfield (remember only last 2 states)
-    // T_LEVEL_UNDEF mode bit drop after 2 shifts
-    rssi = shiftIn();
+    age[i++] = rssi = shiftIn();
     palSetPad(GPIOC, sel);
-    age[i] = rssi;
-    i++;
     if (i >= sweep_points)
       i = 0;
     switch (waiting) {
@@ -539,6 +531,8 @@ void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigg
       }
       break;
     case ST_WAITING:
+      // Store data level bitfield (remember only last 2 states)
+      // T_LEVEL_UNDEF mode bit drop after 2 shifts
 #if 0
       if (rssi < trigger_lvl) {
         data_level = ((data_level<<1) | (T_LEVEL_BELOW))&(T_LEVEL_CLEAN);
@@ -622,7 +616,7 @@ void SI4432_Fill(int s, int start)
 #endif
 
 #define MINIMUM_WAIT_FOR_RSSI   280
-int SI4432_offset_delay = 300;
+uint32_t SI4432_offset_delay = 300;
 
 pureRSSI_t getSI4432_RSSI_correction(void){
   return SI4432_RSSI_correction;
@@ -632,7 +626,6 @@ pureRSSI_t SI4432_RSSI(uint32_t i, int s)
 {
   (void) i;
   int32_t RSSI_RAW;
-  (void) i;
   // SEE DATASHEET PAGE 61
 #ifdef USE_SI4463           // Not used!!!!!!!
   if (SI4432_Sel == 2) {
@@ -686,7 +679,7 @@ pureRSSI_t SI4432_RSSI(uint32_t i, int s)
   return RSSI_RAW;
 }
 
-static uint8_t SI4432_init_script[] =
+static const uint8_t SI4432_init_script[] =
 {
   SI4432_INT_ENABLE1, 0x0,
   SI4432_INT_ENABLE2, 0x0,
