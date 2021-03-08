@@ -130,10 +130,10 @@ extern measurement_t measured;
 #endif
 
 #ifdef __REMOTE_DESKTOP__
-extern volatile int auto_capture;
-extern volatile int mouse_x;
-extern volatile int mouse_y;
-extern volatile int mouse_down;
+extern uint8_t auto_capture;
+extern int16_t mouse_x;
+extern int16_t mouse_y;
+extern uint8_t mouse_down;
 #endif
 
 #ifdef __VNA__
@@ -710,7 +710,7 @@ int marker_search_right_min(int from);
 #define REDRAW_BATTERY    (1<<4)
 #define REDRAW_AREA       (1<<5)
 #define REDRAW_TRIGGER    (1<<6)
-extern volatile uint8_t redraw_request;
+extern  uint8_t redraw_request;
 
 /*
  * ili9341.c

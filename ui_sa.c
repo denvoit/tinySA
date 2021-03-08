@@ -1408,8 +1408,9 @@ static UI_FUNCTION_ADV_CALLBACK(menu_send_display_acb)
     return;
   }
   auto_capture = ! auto_capture;
-//  menu_move_back(true);
-//  draw_cal_status();
+  // Update all screen to CPU
+  if (auto_capture)
+    redraw_request|=REDRAW_AREA|REDRAW_BATTERY|REDRAW_FREQUENCY|REDRAW_CAL_STATUS;
 }
 #endif
 

@@ -104,8 +104,8 @@ static void transform_domain(void);
 static int8_t drive_strength = DRIVE_STRENGTH_AUTO;
 #endif
 uint8_t sweep_mode = SWEEP_ENABLE;
-volatile uint8_t redraw_request = 0; // contains REDRAW_XXX flags
-volatile int auto_capture = false;
+uint8_t redraw_request = 0; // contains REDRAW_XXX flags
+uint8_t auto_capture = false;
 // Version text, displayed in Config->Version menu, also send by info command
 const char *info_about[]={
   BOARD_NAME,
@@ -845,9 +845,9 @@ VNA_SHELL_FUNCTION(cmd_refresh)
   }
 }
 
-volatile int mouse_x = 0;
-volatile int mouse_y = 0;
-volatile int mouse_down = false;
+int16_t mouse_x = 0;
+int16_t mouse_y = 0;
+uint8_t mouse_down = false;
 
 VNA_SHELL_FUNCTION(cmd_touch)
 {
