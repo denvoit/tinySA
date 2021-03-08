@@ -273,7 +273,7 @@ extern float *drive_dBm;
 extern const int8_t drive_dBm [];
 #endif
 extern uint8_t signal_is_AM;
-extern const int reffer_freq[];
+extern const uint32_t reffer_freq[];
 extern freq_t minFreq;
 extern freq_t maxFreq;
 int level_is_calibrated(void);
@@ -632,7 +632,7 @@ extern config_t config;
 //#define settingLevelOffset config.level_offset
 float get_level_offset(void);
 
-extern int in_selftest;
+extern uint8_t in_selftest;
 extern int display_test(void);
 
 //

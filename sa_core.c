@@ -114,9 +114,9 @@ const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0
 
 
 //int setting.refer = -1;  // Off by default
-const int reffer_freq[] = {30000000, 15000000, 10000000, 4000000, 3000000, 2000000, 1000000};
+const uint32_t reffer_freq[] = {30000000, 15000000, 10000000, 4000000, 3000000, 2000000, 1000000};
 
-int in_selftest = false;
+uint8_t in_selftest = false;
 
 void update_min_max_freq(void)
 {
@@ -1904,13 +1904,13 @@ void interpolate_maximum(int m)
   markers[m].frequency = frequencies[idx];
   if (idx > 0 && idx < sweep_points-1)
   {
+    const int32_t delta_Hz = (int64_t)frequencies[idx + 0] - frequencies[idx + 1];
     const float y1         = actual_t[idx - 1];
     const float y2         = actual_t[idx + 0];
     const float y3         = actual_t[idx + 1];
-    const float d          = 0.5f * (y1 - y3) / ((y1 - (2 * y2) + y3) + 1e-12f);
+    const float d          = abs(delta_Hz) * 0.5f * (y1 - y3) / ((y1 - (2 * y2) + y3) + 1e-12f);
     //const float bin      = (float)idx + d;
-    const int32_t delta_Hz = abs((int64_t)frequencies[idx + 0] - frequencies[idx + 1]);
-    markers[m].frequency   += (int32_t)(delta_Hz * d);
+    markers[m].frequency   += d;
   }
 }
 
