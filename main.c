@@ -154,11 +154,13 @@ static THD_FUNCTION(Thread1, arg)
       } else if (sweep_mode & SWEEP_REMOTE) {
       sweep_remote();
 #endif
+#ifdef __CALIBRATE__
       } else if (sweep_mode & SWEEP_CALIBRATE) {
       // call from lowest level to save stack space
       calibrate();
       sweep_mode = SWEEP_ENABLE;
-    } else {
+#endif
+      } else {
 //      if (setting.mode != -1)
         __WFI();
     }
@@ -2438,7 +2440,9 @@ static const VNAShellCommand commands[] =
     { "modulation", cmd_modulation,    0 },
     { "rbw", cmd_rbw,    0 },
     { "mode", cmd_mode,    CMD_WAIT_MUTEX },
+#ifdef __SPUR__
     { "spur", cmd_spur,    0 },
+#endif
 #ifdef TINYSA4
     { "lna", cmd_lna,    0 },
     { "ultra", cmd_ultra,    0 },

@@ -613,6 +613,7 @@ UI_FUNCTION_CALLBACK(menu_autosettings_cb)
 //  draw_cal_status();
 }
 
+#ifdef __CALIBRATE__
 static UI_FUNCTION_CALLBACK(menu_calibrate_cb)
 {
   (void)data;
@@ -626,6 +627,7 @@ static UI_FUNCTION_CALLBACK(menu_calibrate_cb)
     break;
   }
 }
+#endif
 
 static UI_FUNCTION_ADV_CALLBACK(menu_scanning_speed_acb)
 {
@@ -1937,14 +1939,16 @@ static const menuitem_t menu_measure[] = {
   { MT_NONE,   0, NULL, NULL } // sentinel
 };
 
+#ifdef __CALIBRATE__
 static const menuitem_t menu_calibrate[] =
 {
- { MT_FORM | MT_TITLE,      0, "Connect HIGH and LOW",  NULL},
- { MT_FORM | MT_CALLBACK,   0, "CALIBRATE",                 menu_calibrate_cb},
- { MT_FORM | MT_CALLBACK,   0, "RESET CALBRATION",          menu_calibrate_cb},
- { MT_FORM | MT_CANCEL,     0, S_LARROW" BACK",             NULL },
+  { MT_FORM | MT_TITLE,      0, "Connect HIGH and LOW",  NULL},
+  { MT_FORM | MT_CALLBACK,   0, "CALIBRATE",                 menu_calibrate_cb},
+  { MT_FORM | MT_CALLBACK,   0, "RESET CALBRATION",          menu_calibrate_cb},
+  { MT_FORM | MT_CANCEL,     0, S_LARROW" BACK",             NULL },
   { MT_FORM | MT_NONE,     0, NULL, NULL } // sentinel
 };
+#endif
 
 #ifdef __USE_SERIAL_CONSOLE__
 //19200, 38400, 57600, 74800, 115200, 230400, 460800, 921600, 1843200, 3686400
@@ -1992,7 +1996,9 @@ const menuitem_t menu_touch[] = {
 static const menuitem_t menu_config[] = {
   { MT_SUBMENU,  0,                        "TOUCH",     menu_touch},
   { MT_CALLBACK, CONFIG_MENUITEM_SELFTEST, "SELF TEST", menu_config_cb},
+#ifdef __CALIBRATE__
   { MT_SUBMENU,  0,                        "LEVEL CAL", menu_calibrate},
+#endif
   { MT_CALLBACK, CONFIG_MENUITEM_VERSION,  "VERSION",   menu_config_cb},
 #ifdef __USE_SERIAL_CONSOLE__
   { MT_SUBMENU,  0, "CONNECTION", menu_connection},

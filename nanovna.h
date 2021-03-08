@@ -53,22 +53,21 @@
 #endif
 #define __PE4302__
 //#define __SIMULATION__
-//#define __PIPELINE__
-#define __SCROLL__
+#define __SCROLL__                // Add waterfall option
 #define __ICONS__
 #define __MEASURE__
-#define __LINEARITY__         // Not available
-#define __SELFTEST__
-#define __CALIBRATE__
-#define __FAST_SWEEP__          // Pre-fill SI4432 RSSI buffer  to get fastest sweep in zero span mode
+#define __LINEARITY__             // Not available
+#define __SELFTEST__              // Add selftest option (not fully disable it)
+#define __CALIBRATE__             // Add calibration menu and functions
+#define __FAST_SWEEP__            // Pre-fill SI4432 RSSI buffer  to get fastest sweep in zero span mode
 // #define __AUDIO__
 //#define __HAM_BAND__
-#define __SPUR__                // Does spur reduction by shifting IF
+#define __SPUR__                  // Does spur reduction by shifting IF
 //#define __USE_SERIAL_CONSOLE__  // Enable serial I/O connection (need enable HAL_USE_SERIAL as TRUE in halconf.h)
-#define __SINGLE_LETTER__
-#define __NICE_BIG_FONT__
-#define __QUASI_PEAK__
-#define __REMOTE_DESKTOP__
+#define __SINGLE_LETTER__         // Add fast console commands
+#define __NICE_BIG_FONT__         // Add not scaled big font for menus
+#define __QUASI_PEAK__            // Add quasi peak average option
+#define __REMOTE_DESKTOP__        // Add remote desktop option
 #ifdef TINYSA4
 #define  __HARMONIC__
 #endif

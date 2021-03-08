@@ -2517,8 +2517,10 @@ modulation_again:
       goto skip_LO_setting;                                             // No more LO changes required, save some time and jump over the code
 
     freq_t local_IF;
+#ifdef __SPUR__
     spur_second_pass = false;
     again:                                                              // Spur reduction jumps to here for second measurement
+#endif
 
     local_IF=0;                                                         // to get rid of warning
 #ifdef TINYSA4
@@ -4599,9 +4601,9 @@ void reset_calibration(void)
 #define CALIBRATE_RBWS  1
 const int power_rbw [5] = { 100, 300, 30, 10, 3 };
 
+#ifdef __CALIBRATE__
 void calibrate(void)
 {
-#ifdef __CALIBRATE__
   int local_test_status;
   int old_sweep_points = setting._sweep_points;
   in_selftest = true;
@@ -4682,8 +4684,8 @@ quit:
   sweep_mode = SWEEP_ENABLE;
   set_refer_output(-1);
   reset_settings(M_LOW);
-#endif
 }
+#endif
 
 #pragma GCC pop_options
 

@@ -90,7 +90,7 @@ int generic_option_cmd( const char *cmd, const char *cmd_list, int argc, char *a
   return m;
 }
 
-
+#ifdef __SPUR__
 VNA_SHELL_FUNCTION(cmd_spur)
 {
 //  static const char cmd[] = "off|on";
@@ -109,6 +109,7 @@ VNA_SHELL_FUNCTION(cmd_spur)
     redraw_request |= REDRAW_CAL_STATUS | REDRAW_AREA;
   }
 }
+#endif
 
 #ifdef TINYSA4
 VNA_SHELL_FUNCTION(cmd_lna)
