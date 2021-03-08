@@ -705,7 +705,7 @@ static const uint8_t SI4432_init_script[] =
 void SI4432_Sub_Init(void)
 {
   SI4432_Reset();
-  uint8_t *p = SI4432_init_script;
+  const uint8_t *p = SI4432_init_script;
   while (*p) {
     uint8_t r = *p++;
     uint8_t v = *p++;
