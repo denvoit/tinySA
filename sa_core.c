@@ -1294,7 +1294,7 @@ static void calculate_step_delay(void)
     } else {
       // Search index in table depend from RBW
       uint16_t i=0;
-      for (uint16_t i=0;i<ARRAY_COUNT(step_delay_table)-1;i++)
+      for (i=0;i<ARRAY_COUNT(step_delay_table)-1;i++)
         if (actual_rbw_x10 >= step_delay_table[i].rbw_x10)
           break;
 #ifdef __SI4432__
