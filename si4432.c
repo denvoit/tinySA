@@ -104,7 +104,7 @@ static uint8_t shiftIn(void)
   }while(--i);
 #else
   SPI2_CLK_HIGH;
-  value|=SPI2_portSDO;
+  value =SPI2_portSDO;
   SPI2_CLK_LOW;
   value<<=1;
   SPI2_CLK_HIGH;
@@ -186,43 +186,46 @@ uint16_t SI4432_Sel = GPIO_RX_SEL;         // currently selected SI4432
 #define SELECT_DELAY 10
 
 void SI4432_shiftOutDword(uint32_t buf, uint16_t size) {
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  uint16_t port = SI_nSEL[SI4432_Sel];
+  palClearPad(GPIOC, port);
   do{
     shiftOut(buf);
     buf>>=8;
   }while(--size);
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 }
 
 #ifndef SI4432_Write_Byte
 void SI4432_Write_Byte(uint8_t ADR, uint8_t DATA )
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
 
 void SI4432_Write_2_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2)
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA1 );
   shiftOut( DATA2 );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
 #endif
@@ -230,18 +233,19 @@ void SI4432_Write_2_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2)
 #ifndef SI4432_Write_3_Byte
 void SI4432_Write_3_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2, uint8_t DATA3)
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA1 );
   shiftOut( DATA2 );
   shiftOut( DATA3 );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
 #endif
@@ -249,14 +253,15 @@ void SI4432_Write_3_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2, uint8_t DATA
 uint8_t SI4432_Read_Byte(uint8_t ADR)
 {
   uint8_t DATA ;
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
   shiftOut(ADR);
   DATA = shiftIn();
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
   return DATA ;
 }
