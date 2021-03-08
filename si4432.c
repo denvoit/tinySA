@@ -320,7 +320,7 @@ typedef struct {
   int8_t   RSSI_correction_x_10;  // Correction * 10
   uint16_t RBWx10;                // RBW * 10 in kHz
 }RBW_t; // sizeof(RBW_t) = 4 bytes
-RBW_t RBW_choices[] = {
+static const RBW_t RBW_choices[] = {
 // BW register    corr  freq
 //                              {IF_BW(0,5,1),0,26},
 //                              {IF_BW(0,5,2),0,28},
