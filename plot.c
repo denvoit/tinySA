@@ -1318,8 +1318,10 @@ static void cell_draw_marker_info(int x0, int y0)
         float level = (actual_t[markers[1].index] + actual_t[markers[2].index])/2.0 -  actual_t[markers[0].index];
         if (level < -70 || level > 0)
           break;
-//      int depth = powf(10.0, 2.0 + (level + 6.02)             /20.0 );
-        int depth =      expf((2.0 + (level + 6.02))*(logf(10.0)/20.0));
+//      int depth = powf(10.0, 2.0 + (level + 6.02)/20.0 ); //
+//                  powf(10.0, level/20.0 + 6.02/20.0 + 2.0)
+//                  powf(10.0, level            /20.0 ) *  powf(10.0, 6.02/20.0 + 2.0);
+        int depth =       expf(level*(logf(10.0)/20.0)) * (powf(10.0, 6.02/20.0 + 2.0));
 #endif
         plot_printf(buf, sizeof buf, "DEPTH: %3d%%", depth);
         goto show_computed;
