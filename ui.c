@@ -1593,19 +1593,6 @@ menu_is_multiline(const char *label)
 }
 
 static void
-draw_numeric_area_frame(void)
-{
-  ili9341_set_foreground(LCD_INPUT_TEXT_COLOR);
-  ili9341_set_background(LCD_INPUT_BG_COLOR);
-
-  ili9341_fill(0, LCD_HEIGHT-NUM_INPUT_HEIGHT, LCD_WIDTH, NUM_INPUT_HEIGHT);
-  char *name = keypads_mode_tbl[keypad_mode].name;
-  int lines = menu_is_multiline(name);
-  ili9341_drawstring_7x13(name, 10, LCD_HEIGHT-NUM_INPUT_HEIGHT + (NUM_INPUT_HEIGHT-lines*bFONT_STR_HEIGHT)/2);
-  //ili9341_drawfont(KP_KEYPAD, 300, 216);
-}
-
-static void
 draw_numeric_input(const char *buf)
 {
   int i;
@@ -1634,8 +1621,23 @@ draw_numeric_input(const char *buf)
   ili9341_fill(x, LCD_HEIGHT-NUM_INPUT_HEIGHT+4, LCD_WIDTH-x-1, NUM_FONT_GET_WIDTH+2+8);
   if (buf[0] == 0 && kp_help_text != NULL) {
     int  lines = menu_is_multiline(kp_help_text);
+    ili9341_set_foreground(LCD_INPUT_TEXT_COLOR);
     ili9341_drawstring_7x13(kp_help_text, 64+NUM_FONT_GET_WIDTH+2, LCD_HEIGHT-(lines*bFONT_GET_HEIGHT+NUM_INPUT_HEIGHT)/2);
   }
+}
+
+static void
+draw_numeric_area_frame(void)
+{
+  ili9341_set_foreground(LCD_INPUT_TEXT_COLOR);
+  ili9341_set_background(LCD_INPUT_BG_COLOR);
+
+  ili9341_fill(0, LCD_HEIGHT-NUM_INPUT_HEIGHT, LCD_WIDTH, NUM_INPUT_HEIGHT);
+  char *name = keypads_mode_tbl[keypad_mode].name;
+  int lines = menu_is_multiline(name);
+  ili9341_drawstring_7x13(name, 10, LCD_HEIGHT-NUM_INPUT_HEIGHT + (NUM_INPUT_HEIGHT-lines*bFONT_STR_HEIGHT)/2);
+  //ili9341_drawfont(KP_KEYPAD, 300, 216);
+  draw_numeric_input("");
 }
 
 #ifdef __VNA__
