@@ -852,8 +852,8 @@ uint8_t mouse_down = false;
 VNA_SHELL_FUNCTION(cmd_touch)
 {
   if (argc == 2){
-    mouse_x = (uint32_t)my_atoi(argv[0]);
-    mouse_y = (uint32_t)my_atoi(argv[1]);
+    mouse_x = my_atoi(argv[0]);
+    mouse_y = my_atoi(argv[1]);
     mouse_down = true;
     handle_touch_interrupt();
   }
@@ -862,8 +862,8 @@ VNA_SHELL_FUNCTION(cmd_touch)
 VNA_SHELL_FUNCTION(cmd_release)
 {
   if (argc==2) {
-    mouse_x = (uint32_t)my_atoi(argv[0]);
-    mouse_y = (uint32_t)my_atoi(argv[1]);
+    mouse_x = my_atoi(argv[0]);
+    mouse_y = my_atoi(argv[1]);
   }
   mouse_down = false;
   handle_touch_interrupt();
@@ -2404,7 +2404,7 @@ static const VNAShellCommand commands[] =
     {"touch"       , cmd_touch       , 0},
     {"release"     , cmd_release     , 0},
 #endif
-    {"vbat"        , cmd_vbat        , CMD_WAIT_MUTEX},     // Uses same adc as touch!!!!!
+    {"vbat"        , cmd_vbat        , 0},     // Uses same adc as touch!!!!!
 #ifdef ENABLE_VBAT_OFFSET_COMMAND
     {"vbat_offset" , cmd_vbat_offset , 0},
 #endif
