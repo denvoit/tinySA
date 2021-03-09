@@ -104,8 +104,8 @@ static void transform_domain(void);
 static int8_t drive_strength = DRIVE_STRENGTH_AUTO;
 #endif
 uint8_t sweep_mode = SWEEP_ENABLE;
-volatile uint8_t redraw_request = 0; // contains REDRAW_XXX flags
-volatile int auto_capture = false;
+uint8_t redraw_request = 0; // contains REDRAW_XXX flags
+uint8_t auto_capture = false;
 // Version text, displayed in Config->Version menu, also send by info command
 const char *info_about[]={
   BOARD_NAME,
@@ -122,7 +122,7 @@ const char *info_about[]={
   0 // sentinel
 };
 
-uint16_t dirty = true;
+bool dirty = true;
 
 bool completed = false;
 
@@ -154,11 +154,13 @@ static THD_FUNCTION(Thread1, arg)
       } else if (sweep_mode & SWEEP_REMOTE) {
       sweep_remote();
 #endif
+#ifdef __CALIBRATE__
       } else if (sweep_mode & SWEEP_CALIBRATE) {
       // call from lowest level to save stack space
       calibrate();
       sweep_mode = SWEEP_ENABLE;
-    } else {
+#endif
+      } else {
 //      if (setting.mode != -1)
         __WFI();
     }
@@ -184,13 +186,11 @@ static THD_FUNCTION(Thread1, arg)
     // Process collected data, calculate trace coordinates and plot only if scan
     // completed
     if (/* sweep_mode & SWEEP_ENABLE && */ completed) {
-#ifdef __VNA__
-      if ((domain_mode & DOMAIN_MODE) == DOMAIN_TIME) transform_domain();
-#endif	  
+//      START_PROFILE;
       // Prepare draw graphics, cache all lines, mark screen cells for redraw
       plot_into_index(measured);
       redraw_request |= REDRAW_CELLS | REDRAW_BATTERY;
-
+//      STOP_PROFILE;
       if (uistat.marker_tracking) {
         int i = marker_search_max();
         if (i != -1 && active_marker != MARKER_INVALID) {
@@ -358,6 +358,39 @@ int shell_serial_printf(const char *fmt, ...)
   return formatted_bytes;
 }
 #endif
+
+//
+// Function used for search substring v in list
+// Example need search parameter "center" in "start|stop|center|span|cw" getStringIndex return 2
+// If not found return -1
+// Used for easy parse command arguments
+static int get_str_index(const char *v, const char *list)
+{
+  int i = 0;
+  while (1) {
+    const char *p = v;
+    while (1) {
+      char c = *list;
+      if (c == '|') c = 0;
+      if (c == *p++) {
+        // Found, return index
+        if (c == 0) return i;
+        list++;    // Compare next symbol
+        continue;
+      }
+      break;  // Not equal, break
+    }
+    // Set new substring ptr
+    while (1) {
+      // End of string, not found
+      if (*list == 0) return -1;
+      if (*list++ == '|') break;
+    }
+    i++;
+  }
+  return -1;
+}
+
 VNA_SHELL_FUNCTION(cmd_pause)
 {
   (void)argc;
@@ -386,7 +419,7 @@ VNA_SHELL_FUNCTION(cmd_reset)
   (void)argv;
 
   if (argc == 1) {
-    if (strcmp(argv[0], "dfu") == 0) {
+    if (get_str_index(argv[0], "dfu") == 0) {
       shell_printf("Performing reset to DFU mode\r\n");
       enter_dfu();
       return;
@@ -550,37 +583,6 @@ my_atof(const char *p)
   return x;
 }
 
-//
-// Function used for search substring v in list
-// Example need search parameter "center" in "start|stop|center|span|cw" getStringIndex return 2
-// If not found return -1
-// Used for easy parse command arguments
-static int get_str_index(char *v, const char *list)
-{
-  int i = 0;
-  while (1) {
-    char *p = v;
-    while (1) {
-      char c = *list;
-      if (c == '|') c = 0;
-      if (c == *p++) {
-        // Found, return index
-        if (c == 0) return i;
-        list++;    // Compare next symbol
-        continue;
-      }
-      break;  // Not equal, break
-    }
-    // Set new substring ptr
-    while (1) {
-      // End of string, not found
-      if (*list == 0) return -1;
-      if (*list++ == '|') break;
-    }
-    i++;
-  }
-  return -1;
-}
 #ifdef __VNA__
 VNA_SHELL_FUNCTION(cmd_offset)
 {
@@ -692,7 +694,7 @@ VNA_SHELL_FUNCTION(cmd_clearconfig)
     return;
   }
 
-  if (strcmp(argv[0], "1234") != 0) {
+  if (get_str_index(argv[0], "1234") != 0) {
     shell_printf("Key unmatched.\r\n");
     return;
   }
@@ -802,10 +804,11 @@ VNA_SHELL_FUNCTION(cmd_data)
   if (argc == 1)
     sel = my_atoi(argv[0]);
 
-
   if (sel >= 0 && sel <= MAX_DATA) {
+    static const uint8_t sel_conv[]={TRACE_TEMP, TRACE_STORED, TRACE_ACTUAL};
+    float *data = measured[sel_conv[sel]];
     for (i = 0; i < sweep_points; i++)
-      shell_printf("%f\r\n", value(measured[sel][i]));
+      shell_printf("%f\r\n", value(data[i]));
     return;
   }
   shell_printf("usage: data [0-2]\r\n");
@@ -844,15 +847,15 @@ VNA_SHELL_FUNCTION(cmd_refresh)
   }
 }
 
-volatile int mouse_x = 0;
-volatile int mouse_y = 0;
-volatile int mouse_down = false;
+int16_t mouse_x = 0;
+int16_t mouse_y = 0;
+uint8_t mouse_down = false;
 
 VNA_SHELL_FUNCTION(cmd_touch)
 {
   if (argc == 2){
-    mouse_x = (uint32_t)my_atoi(argv[0]);
-    mouse_y = (uint32_t)my_atoi(argv[1]);
+    mouse_x = my_atoi(argv[0]);
+    mouse_y = my_atoi(argv[1]);
     mouse_down = true;
     handle_touch_interrupt();
   }
@@ -861,8 +864,8 @@ VNA_SHELL_FUNCTION(cmd_touch)
 VNA_SHELL_FUNCTION(cmd_release)
 {
   if (argc==2) {
-    mouse_x = (uint32_t)my_atoi(argv[0]);
-    mouse_y = (uint32_t)my_atoi(argv[1]);
+    mouse_x = my_atoi(argv[0]);
+    mouse_y = my_atoi(argv[1]);
   }
   mouse_down = false;
   handle_touch_interrupt();
@@ -888,28 +891,38 @@ VNA_SHELL_FUNCTION(cmd_capture)
   for (y = 0; y < LCD_HEIGHT; y += 2) {
     // use uint16_t spi_buffer[2048] (defined in ili9341) for read buffer
     uint8_t *buf = (uint8_t *)spi_buffer;
-    ili9341_read_memory(0, y, LCD_WIDTH, 2, 2 * LCD_WIDTH, spi_buffer);
-    streamWrite(shell_stream, (void*)buf, 2 * 2 * LCD_WIDTH);
+    ili9341_read_memory(0, y, LCD_WIDTH, 2, spi_buffer);
+    streamWrite(shell_stream, (void*)buf, 2 * LCD_WIDTH * sizeof(uint16_t));
   }
 }
 
 void send_region(const char *t, int x, int y, int w, int h)
 {
-  shell_printf(t);
-  struct {
-    char new_str[2];
-    uint16_t x;
-    uint16_t y;
-    uint16_t w;
-    uint16_t h;
-  } region={"\r\n", x,y,w,h};
-  streamWrite(shell_stream, (void*)&region, sizeof(region));
+  if (SDU1.config->usbp->state == USB_ACTIVE) {
+    shell_printf(t);
+    struct {
+      char new_str[2];
+      uint16_t x;
+      uint16_t y;
+      uint16_t w;
+      uint16_t h;
+    } region={"\r\n", x,y,w,h};
+    streamWrite(shell_stream, (void*)&region, sizeof(region));
+  }
+  else
+    auto_capture = false;
 }
 
 void send_buffer(uint8_t * buf, int s)
 {
-  streamWrite(shell_stream, (void*) buf, s);
-  streamWrite(shell_stream, (void*)"ch> \r\n", 6);
+  if (SDU1.config->usbp->state == USB_ACTIVE) {
+    while (s > 0) {
+      streamWrite(shell_stream, (void*) buf, (s > 128 ? 128 : s));
+      buf = buf+128;
+      s -= 128;
+    }
+    streamWrite(shell_stream, (void*)"ch> \r\n", 6);
+  }
 }
 
 #if 0
@@ -980,9 +993,10 @@ config_t config = {
   .high_correction_frequency = { 240000000, 280000000, 300000000, 400000000, 500000000, 600000000, 700000000, 800000000, 900000000, 960000000 },
   .high_correction_value = { 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0 },
   .setting_frequency_10mhz = 10000000,
-  .cor_am = -14,
-  .cor_wfm = -17,
-  .cor_nfm = -17,
+  .cor_am = -8,
+  .cor_wfm = -15,
+  .cor_nfm = -15,
+  .ext_zero_level = 128,
 #endif
 #ifdef TINYSA4
   .vbat_offset = 220,
@@ -1003,6 +1017,7 @@ config_t config = {
   .cor_nfm = -55,
   .ultra = false,
   .high_out_adf4350 = true,
+  .ext_zero_level = 174,
 #endif
   .sweep_voltage = 3.3,
   .switch_offset = 0.0,
@@ -1013,9 +1028,9 @@ config_t config = {
 
 // NanoVNA Default settings
 static const trace_t def_trace[TRACES_MAX] = {//enable, type, channel, reserved, scale, refpos
-    { 0, TRC_LOGMAG, 0, 0, 10.0, (float) NGRIDY+1 },  //Temp
-    { 0, TRC_LOGMAG, 1, 0, 10.0, (float) NGRIDY+1 },  //Stored
-    { 1, TRC_LOGMAG, 2, 0, 10.0, (float) NGRIDY+1 }   //Actual
+ [TRACE_TEMP]   = { 0},  //Temp
+ [TRACE_STORED] = { 0},  //Stored
+ [TRACE_ACTUAL] = { 1}   //Actual
 };
 
 static const marker_t def_markers[MARKERS_MAX] = {
@@ -1043,6 +1058,8 @@ void load_LCD_properties(void)
 //=============================================
   setting._electrical_delay = 0.0;
 #endif
+  setting.trace_scale = 10.0;
+  setting.trace_refpos = 0;
   memcpy(setting._trace, def_trace, sizeof(def_trace));
   memcpy(setting._markers, def_markers, sizeof(def_markers));
 #ifdef __VNA__
@@ -1058,10 +1075,10 @@ void load_LCD_properties(void)
 //setting.checksum = 0;
 }
 
+#ifdef __VNA__
 void
 ensure_edit_config(void)
 {
-#ifdef __VNA__
   if (active_props == &current_props)
     return;
 
@@ -1069,8 +1086,8 @@ ensure_edit_config(void)
   active_props = &current_props;
   // move to uncal state
   cal_status = 0;
-#endif
 }
+#endif
 
 #include "sa_core.c"
 #ifdef __AUDIO__
@@ -1168,9 +1185,9 @@ VNA_SHELL_FUNCTION(cmd_scan)
     if (mask) {
       for (i = 0; i < points; i++) {
         if (mask & 1) shell_printf("%U ", frequencies[i]);
-        if (mask & 2) shell_printf("%f %f ", value(measured[2][i]), 0.0);
-        if (mask & 4) shell_printf("%f %f ", value(measured[1][i]), 0.0);
-        if (mask & 8) shell_printf("%f %f ", value(measured[0][i]), 0.0);
+        if (mask & 2) shell_printf("%f %f ", value(measured[TRACE_ACTUAL][i]), 0.0);
+        if (mask & 4) shell_printf("%f %f ", value(measured[TRACE_STORED][i]), 0.0);
+        if (mask & 8) shell_printf("%f %f ", value(measured[TRACE_TEMP][i]), 0.0);
         shell_printf("\r\n");
       }
     }
@@ -1267,81 +1284,57 @@ update_frequencies(void)
 void
 set_sweep_frequency(int type, freq_t freq)
 {
-#ifdef __VNA__
-  int cal_applied = cal_status & CALSTAT_APPLY;
-#endif
-
   // Check frequency for out of bounds (minimum SPAN can be any value)
   if (type != ST_SPAN && freq < START_MIN)
     freq = START_MIN;
   if (freq > STOP_MAX)
     freq = STOP_MAX;
-  // CW mode if span freq = 0
-  if (type == ST_SPAN && freq == 0){
-    type = ST_CW;
-    freq = setting.frequency0 / 2 + setting.frequency1 / 2;
-  }
-  ensure_edit_config();
+  bool cw_mode = FREQ_IS_CW(); // remember old mode
+  freq_t center, span;
   switch (type) {
     case ST_START:
       setting.freq_mode &= ~FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency0 != freq) {
-        setting.frequency0 = freq;
-        // if start > stop then make start = stop
-        if (setting.frequency1 < freq) setting.frequency1 = freq;
-      }
+      setting.frequency0 = freq;
+      // if start > stop then make start = stop
+      if (setting.frequency1 < freq) setting.frequency1 = freq;
       break;
     case ST_STOP:
       setting.freq_mode &= ~FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency1 != freq) {
-        setting.frequency1 = freq;
-        // if start > stop then make start = stop
-        if (setting.frequency0 > freq) setting.frequency0 = freq;
-      }
+      setting.frequency1 = freq;
+      // if start > stop then make start = stop
+      if (setting.frequency0 > freq) setting.frequency0 = freq;
       break;
     case ST_CENTER:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      freq_t center = setting.frequency0 / 2 + setting.frequency1 / 2;
-      if (center != freq) {
-        freq_t span = setting.frequency1 - setting.frequency0;
-        if (freq < START_MIN + span / 2) {
-          span = (freq - START_MIN) * 2;
-        }
-        if (freq > STOP_MAX - span / 2) {
-          span = (STOP_MAX - freq) * 2;
-        }
-        setting.frequency0 = freq - span / 2;
-        setting.frequency1 = freq + span / 2;
-      }
+      center = setting.frequency0/2 + setting.frequency1/2;
+      span   = (setting.frequency1 - setting.frequency0)/2;
+      if (freq < START_MIN + span)
+        span = (freq - START_MIN);
+      if (freq > STOP_MAX - span)
+        span = (STOP_MAX - freq);
+      setting.frequency0 = freq - span;
+      setting.frequency1 = freq + span;
       break;
     case ST_SPAN:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency1 - setting.frequency0 != freq) {
-        freq_t center = setting.frequency0 / 2 + setting.frequency1 / 2;
-        if (center < START_MIN + freq / 2) {
-          center = START_MIN + freq / 2;
-        }
-        if (center > STOP_MAX - freq / 2) {
-          center = STOP_MAX - freq / 2;
-        }
-        setting.frequency0 = center - freq / 2;
-        setting.frequency1 = center + freq / 2;
-      }
+      center = setting.frequency0/2 + setting.frequency1/2;
+      span = freq/2;
+      if (center < START_MIN + span)
+        center = START_MIN + span;
+      if (center > STOP_MAX - span)
+        center = STOP_MAX - span;
+      setting.frequency0 = center - span;
+      setting.frequency1 = center + span;
       break;
     case ST_CW:
       setting.freq_mode |= FREQ_MODE_CENTER_SPAN;
-      if (setting.frequency0 != freq || setting.frequency1 != freq) {
-        setting.frequency0 = freq;
-        setting.frequency1 = freq;
-        setting.sweep_time_us = 0; // use minimum as start
-      }
+      setting.frequency0 = freq;
+      setting.frequency1 = freq;
       break;
   }
+  if (!cw_mode && FREQ_IS_CW()) // switch to CW mode
+    setting.sweep_time_us = 0;  // use minimum as start
   update_frequencies();
-#ifdef __VNA__
-  if (cal_auto_interpolate && cal_applied)
-    cal_interpolate(lastsaveid);
-#endif
 }
 
 freq_t
@@ -1819,91 +1812,24 @@ VNA_SHELL_FUNCTION(cmd_recall)
   shell_printf("recall {id}\r\n");
 }
 
-static const struct {
-  const char *name;
-  uint16_t refpos;
-  float scale_unit;
-} trace_info[] = {
-  { "LOGMAG", NGRIDY,  10.0 },
-#ifdef __VNA__
-  { "PHASE",  NGRIDY/2,  90.0 },
-  { "DELAY",  NGRIDY/2,  1e-9 },
-  { "SMITH",         0,  1.00 },
-  { "POLAR",         0,  1.00 },
-  { "LINEAR",        0,  0.125},
-  { "SWR",           0,  0.25 },
-  { "REAL",   NGRIDY/2,  0.25 },
-  { "IMAG",   NGRIDY/2,  0.25 },
-  { "R",      NGRIDY/2, 100.0 },
-  { "X",      NGRIDY/2, 100.0 }
-#endif
-};
-
-#ifdef __VNA__
-static const char * const trc_channel_name[] = {
-  "CH0", "CH1"
-};
-#endif
 const char * const trc_channel_name[] = {
-  "ACTUAL", "STORED", "COMPUTED"
+  [TRACE_ACTUAL] = "ACTUAL",
+  [TRACE_STORED] = "STORED",
+  [TRACE_TEMP]   = "COMPUTED",
 };
-const char *get_trace_typename(int t)
-{
-  return trace_info[trace[t].type].name;
-}
-
-void set_trace_type(int t, int type)
-{
-  int enabled = type != TRC_OFF;
-  int force = FALSE;
-
-  if (trace[t].enabled != enabled) {
-    trace[t].enabled = enabled;
-    force = TRUE;
-  }
-  if (trace[t].type != type) {
-    trace[t].type = type;
-    // Set default trace refpos
-    trace[t].refpos = trace_info[type].refpos;
-    // Set default trace scale
-    trace[t].scale  = trace_info[type].scale_unit;
-    force = TRUE;
-  }
-  if (force) {
-    plot_into_index(measured);
-    redraw_request |= REDRAW_AREA;
-  }
-}
-
 
 void set_trace_scale(float scale)
 {
-  if (trace[TRACE_ACTUAL].scale != scale){
-    trace[TRACE_ACTUAL].scale = scale;
-    trace[TRACE_STORED].scale = scale;
-    trace[TRACE_TEMP].scale = scale;
-    redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
-  }
-}
-
-float get_trace_scale(int t)
-{
-  return trace[t].scale;
+  if (setting.trace_scale == scale) return;
+  setting.trace_scale = scale;
+  redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
 }
 
 void set_trace_refpos(float refpos)
 {
-  if (trace[TRACE_ACTUAL].refpos != refpos){
-    trace[TRACE_ACTUAL].refpos = refpos;
-    trace[TRACE_STORED].refpos = refpos;
-    trace[TRACE_TEMP].refpos = refpos;
-    redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
-  }
-}
-
-float get_trace_refpos(int t)
-{
-  return trace[t].refpos;
+  if (setting.trace_refpos == refpos) return;
+  setting.trace_refpos = refpos;
+  redraw_request |= REDRAW_AREA | REDRAW_CAL_STATUS;
 }
 
 VNA_SHELL_FUNCTION(cmd_trace)
@@ -1913,9 +1839,9 @@ VNA_SHELL_FUNCTION(cmd_trace)
     for (t = 0; t < TRACES_MAX; t++) {
       if (trace[t].enabled) {
         const char *type = unit_string[setting.unit]; // get_trace_typename(t);
-        const char *channel = trc_channel_name[trace[t].channel];
-        float scale = get_trace_scale(t);
-        float refpos = get_trace_refpos(t);
+        const char *channel = trc_channel_name[t];
+        float scale = get_trace_scale();
+        float refpos = get_trace_refpos();
         shell_printf("%d %s %s %f %f\r\n", t, type, channel, scale, refpos);
       }
     }
@@ -1926,8 +1852,8 @@ VNA_SHELL_FUNCTION(cmd_trace)
     t = my_atoi(argv[0]);
     if (argc != 1 || t < 0 || t >= TRACES_MAX)
       goto usage;
-    const char *type = get_trace_typename(t);
-    const char *channel = trc_channel_name[trace[t].channel];
+    const char *type = "LOGMAG";//unit_string[setting.unit];
+    const char *channel = trc_channel_name[t];
     shell_printf("%d %s %s\r\n", t, type, channel);
     return;
   }
@@ -1966,7 +1892,7 @@ VNA_SHELL_FUNCTION(cmd_trace)
   if (argc == 2) {
     switch (get_str_index(argv[0], cmd_scale_ref_list)) {
     case 0:
-      if (strcmp(argv[1],"auto") == 0) {
+      if (get_str_index(argv[1],"auto") == 0) {
         set_auto_reflevel(true);
       } else {
         user_set_scale(my_atof(argv[1]));
@@ -1974,7 +1900,7 @@ VNA_SHELL_FUNCTION(cmd_trace)
       goto update;
     case 1:
       //trace[t].refpos = my_atof(argv[2]);
-      if (strcmp(argv[1],"auto") == 0) {
+      if (get_str_index(argv[1],"auto") == 0) {
         set_auto_reflevel(true);
       } else {
         user_set_reflevel(my_atof(argv[1]));
@@ -2033,7 +1959,7 @@ VNA_SHELL_FUNCTION(cmd_marker)
     return;
   }
   redraw_request |= REDRAW_MARKER;
-  if (strcmp(argv[0], "off") == 0) {
+  if (get_str_index(argv[0], "off") == 0) {
     active_marker = MARKER_INVALID;
     for (t = 0; t < MARKERS_MAX; t++)
       markers[t].enabled = FALSE;
@@ -2459,6 +2385,7 @@ static const VNAShellCommand commands[] =
 //  {"gamma"       , cmd_gamma       , 0},
     {"scan"        , cmd_scan        , CMD_WAIT_MUTEX},
     {"scanraw"     , cmd_scanraw     , CMD_WAIT_MUTEX},
+    {"zero"        , cmd_zero        , CMD_WAIT_MUTEX},
     {"sweep"       , cmd_sweep       , 0},
     {"test"        , cmd_test        , 0},
     {"touchcal"    , cmd_touchcal    , CMD_WAIT_MUTEX},
@@ -2486,7 +2413,7 @@ static const VNAShellCommand commands[] =
     {"touch"       , cmd_touch       , 0},
     {"release"     , cmd_release     , 0},
 #endif
-    {"vbat"        , cmd_vbat        , CMD_WAIT_MUTEX},     // Uses same adc as touch!!!!!
+    {"vbat"        , cmd_vbat        , 0},     // Uses same adc as touch!!!!!
 #ifdef ENABLE_VBAT_OFFSET_COMMAND
     {"vbat_offset" , cmd_vbat_offset , 0},
 #endif
@@ -2513,7 +2440,9 @@ static const VNAShellCommand commands[] =
     { "modulation", cmd_modulation,    0 },
     { "rbw", cmd_rbw,    0 },
     { "mode", cmd_mode,    CMD_WAIT_MUTEX },
+#ifdef __SPUR__
     { "spur", cmd_spur,    0 },
+#endif
 #ifdef TINYSA4
     { "lna", cmd_lna,    0 },
     { "ultra", cmd_ultra,    0 },
@@ -2753,7 +2682,7 @@ static void VNAShell_executeLine(char *line)
   // Execute line
   const VNAShellCommand *scp;
   for (scp = commands; scp->sc_name != NULL; scp++) {
-    if (strcmp(scp->sc_name, shell_args[0]) == 0) {
+    if (get_str_index(scp->sc_name, shell_args[0]) == 0) {
       if (scp->flags & CMD_WAIT_MUTEX) {
         shell_function = scp->sc_function;
         operation_requested|=OP_CONSOLE;

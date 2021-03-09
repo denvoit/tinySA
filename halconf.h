@@ -320,7 +320,7 @@
 #ifdef TINYSA4
 #define SERIAL_USB_BUFFERS_SIZE     128
 #else
-#define SERIAL_USB_BUFFERS_SIZE     64
+#define SERIAL_USB_BUFFERS_SIZE     128
 #endif
 #endif
 

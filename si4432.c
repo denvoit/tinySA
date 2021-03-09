@@ -24,6 +24,8 @@
 #include <math.h>
 #include "si4432.h"
 
+#define _FAST_SHIFT_
+
 #pragma GCC push_options
 #pragma GCC optimize ("O2")
 
@@ -52,71 +54,117 @@ static void shiftOut(uint8_t val)
 {
 //  SI4432_log(SI4432_Sel);
 //  SI4432_log(val);
-  uint8_t i = 0;
+#ifndef _FAST_SHIFT_
+  uint16_t i = 8;
   do {
     if (val & 0x80)
       SPI2_SDI_HIGH;
     SPI2_CLK_HIGH;
     SPI2_RESET;
     val<<=1;
-  }while((++i) & 0x07);
+  }while(--i);
+#else
+  if (val & 0x80) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x40) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x20) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x10) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x08) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x04) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x02) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+  if (val & 0x01) SPI2_SDI_HIGH;
+  SPI2_CLK_HIGH;
+  SPI2_RESET;
+#endif
 }
 
 static uint8_t shiftIn(void)
 {
   uint32_t value = 0;
-  uint8_t i = 0;
+#ifndef _FAST_SHIFT_
+  uint16_t i = 8;
   do {
     value<<=1;
     SPI2_CLK_HIGH;
     value|=SPI2_portSDO;
     SPI2_CLK_LOW;
-  }while((++i) & 0x07);
+  }while(--i);
+#else
+  SPI2_CLK_HIGH;
+  value =SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+  value<<=1;
+  SPI2_CLK_HIGH;
+  value|=SPI2_portSDO;
+  SPI2_CLK_LOW;
+#endif
   return value>>GPIO_SPI2_SDO;
 }
 
 static inline void shiftInBuf(uint16_t sel, uint8_t addr, deviceRSSI_t *buf, uint16_t size, uint16_t delay) {
-  uint8_t i = 0;
+  int idx = 0;
   do{
+   palClearPad(GPIOC, sel);
     uint32_t value = addr;
-    palClearPad(GPIOC, sel);
+    uint16_t i = 8;
     do {
-      if (value & 0x80)
-        SPI2_SDI_HIGH;
+      if (value & 0x80) SPI2_SDI_HIGH;
       SPI2_CLK_HIGH;
       SPI2_RESET;
       value<<=1;
-    }while((++i) & 0x07);
+    }while(--i);
     value = 0;
+    i = 8;
     do {
       SPI2_CLK_HIGH;
       value<<=1;
       value|=SPI2_portSDO;
       SPI2_CLK_LOW;
-    }while((++i) & 0x07);
+    }while(--i);
+    buf[idx]=value>>GPIO_SPI2_SDO;
     palSetPad(GPIOC, sel);
-    *buf++=value>>GPIO_SPI2_SDO;
+    if (++idx >=size) return;
     if (delay)
       my_microsecond_delay(delay);
-  }while(--size);
+  }while(1);
 }
-#if 0
-static void shiftOutBuf(uint8_t *buf, uint16_t size) {
-  uint8_t i = 0;
-  do{
-    uint8_t val = *buf++;
-    do{
-      if (val & 0x80)
-        SPI2_SDI_HIGH;
-      else
-        SPI2_SDI_LOW;
-      val<<=1;
-      SPI2_CLK_HIGH;
-      SPI2_CLK_LOW;
-    }while((++i) & 0x07);
-  }while(--size);
-}
-#endif
 
 #ifdef __SI4432__
 #define CS_SI0_HIGH     palSetPad(GPIOC, GPIO_RX_SEL)
@@ -131,75 +179,92 @@ static void shiftOutBuf(uint8_t *buf, uint16_t size) {
 
 const uint16_t SI_nSEL[MAX_SI4432+1] = { GPIO_RX_SEL, GPIO_LO_SEL, 0}; // #3 is dummy!!!!!!
 
-volatile int SI4432_Sel = 0;         // currently selected SI4432
+uint16_t SI4432_Sel = GPIO_RX_SEL;         // currently selected SI4432
 // volatile int SI4432_guard = 0;
 
 #ifdef __SI4432_H__
 #define SELECT_DELAY 10
+
+void SI4432_shiftOutDword(uint32_t buf, uint16_t size) {
+  uint16_t port = SI_nSEL[SI4432_Sel];
+  palClearPad(GPIOC, port);
+  do{
+    shiftOut(buf);
+    buf>>=8;
+  }while(--size);
+  palSetPad(GPIOC, port);
+}
+
+#ifndef SI4432_Write_Byte
 void SI4432_Write_Byte(uint8_t ADR, uint8_t DATA )
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
 
 void SI4432_Write_2_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2)
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA1 );
   shiftOut( DATA2 );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
+#endif
 
-void SI4432_Write_3_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2, uint8_t DATA3 )
+#ifndef SI4432_Write_3_Byte
+void SI4432_Write_3_Byte(uint8_t ADR, uint8_t DATA1, uint8_t DATA2, uint8_t DATA3)
 {
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palClearPad(GPIOC, port);
 //  chThdSleepMicroseconds(SELECT_DELAY);
   ADR |= 0x80 ; // RW = 1
   shiftOut( ADR );
   shiftOut( DATA1 );
   shiftOut( DATA2 );
   shiftOut( DATA3 );
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
 }
+#endif
 
-uint8_t SI4432_Read_Byte( uint8_t ADR )
+uint8_t SI4432_Read_Byte(uint8_t ADR)
 {
   uint8_t DATA ;
+  uint16_t port = SI_nSEL[SI4432_Sel];
 //  if (SI4432_guard)
 //    while(1) ;
 //  SI4432_guard = 1;
 //  SPI2_CLK_LOW;
-  palClearPad(GPIOC, SI_nSEL[SI4432_Sel]);
-  shiftOut( ADR );
+  palClearPad(GPIOC, port);
+  shiftOut(ADR);
   DATA = shiftIn();
-  palSetPad(GPIOC, SI_nSEL[SI4432_Sel]);
+  palSetPad(GPIOC, port);
 //  SI4432_guard = 0;
   return DATA ;
 }
-
-
 
 void SI4432_Reset(void)
 {
@@ -260,7 +325,7 @@ typedef struct {
   int8_t   RSSI_correction_x_10;  // Correction * 10
   uint16_t RBWx10;                // RBW * 10 in kHz
 }RBW_t; // sizeof(RBW_t) = 4 bytes
-RBW_t RBW_choices[] = {
+static const RBW_t RBW_choices[] = {
 // BW register    corr  freq
 //                              {IF_BW(0,5,1),0,26},
 //                              {IF_BW(0,5,2),0,28},
@@ -323,8 +388,6 @@ RBW_t RBW_choices[] = {
 
 };
 
-const int SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
-
 static pureRSSI_t SI4432_RSSI_correction = float_TO_PURE_RSSI(-120);
 
 uint16_t force_rbw(int i)
@@ -336,22 +399,22 @@ uint16_t force_rbw(int i)
 }
 
 uint16_t set_rbw(uint16_t WISH)  {
-  int i;
-  for (i=0; i < SI4432_RBW_count - 1; i++)
+  uint16_t i;
+  for (i=0; i <ARRAY_COUNT(RBW_choices) - 1; i++)
     if (WISH <= RBW_choices[i].RBWx10) 
       break; 
   return force_rbw(i);
 }
 
 
-int SI4432_frequency_changed = false;
-int SI4432_offset_changed = false;
+uint8_t SI4432_frequency_changed = false;
+uint8_t SI4432_offset_changed = false;
 
 // #define __CACHE_BAND__  // Is not reliable!!!!!!
 
 #ifdef __CACHE_BAND__
-static int old_freq_band[2] = {-1,-1};
-static int written[2]= {0,0};
+static uint8_t old_freq_band[2] = {-1,-1};
+static uint8_t written[2]= {0,0};
 #endif
 
 void SI4432_Set_Frequency ( freq_t Freq ) {
@@ -387,7 +450,7 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
 #ifdef __CACHE_BAND__
   if (old_freq_band[SI4432_Sel] == Freq_Band) {
     if (written[SI4432_Sel] < 4) {
-      SI4432_Write_Byte ( 0x75, Freq_Band );
+      SI4432_Write_Byte(SI4432_FREQBAND, Freq_Band );
       written[SI4432_Sel]++;
     }
     SI4432_Write_Byte(SI4432_FREQCARRIER_H, (Carrier>>8) & 0xFF );
@@ -395,7 +458,7 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
   } else {
 #endif
 #if 0       // Do not use multi byte write
-    SI4432_Write_Byte ( 0x75, Freq_Band );                          // Freq band must be written first !!!!!!!!!!!!
+    SI4432_Write_Byte(SI4432_FREQBAND, Freq_Band );                          // Freq band must be written first !!!!!!!!!!!!
     SI4432_Write_Byte(SI4432_FREQCARRIER_H, (Carrier>>8) & 0xFF );
     SI4432_Write_Byte(SI4432_FREQCARRIER_L, Carrier & 0xFF  );
 #else
@@ -413,13 +476,13 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
 //    SI4432_Write_Byte( 0x07, 0x0B);
 }
 
-int SI4432_step_delay = 1500;
+uint32_t SI4432_step_delay = 1500;
 //extern int setting.repeat;
 
 #ifdef __FAST_SWEEP__
 extern deviceRSSI_t age[POINTS_COUNT];
-static int buf_index = 0;
-static int buf_end = 0;
+static uint16_t buf_index = 0;
+static uint16_t buf_end = 0;
 static bool  buf_read = false;
 
 #if 0
@@ -453,26 +516,16 @@ void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigg
   systime_t measure = chVTGetSystemTimeX();
   int waiting = ST_ARMING;
 //  __disable_irq();
-  SPI2_CLK_LOW;
   int i = 0;
-
-  register uint16_t t_mode;
+  uint16_t t_mode = up_direction ? T_UP_MASK : T_DOWN_MASK;
   uint16_t data_level = T_LEVEL_UNDEF;
-  if (up_direction)
-    t_mode = T_UP_MASK;
-  else
-    t_mode = T_DOWN_MASK;
   do {
+    if (operation_requested)                        // allow aborting a wait for trigger
+      return;                                       // abort
     palClearPad(GPIOC, sel);
     shiftOut(SI4432_REG_RSSI);
-    if (operation_requested)                        // allow aborting a wait for trigger
-      return;                                                           // abort
-    // Store data level bitfield (remember only last 2 states)
-    // T_LEVEL_UNDEF mode bit drop after 2 shifts
-    rssi = shiftIn();
+    age[i++] = rssi = shiftIn();
     palSetPad(GPIOC, sel);
-    age[i] = rssi;
-    i++;
     if (i >= sweep_points)
       i = 0;
     switch (waiting) {
@@ -483,7 +536,9 @@ void SI4432_trigger_fill(int s, uint8_t trigger_lvl, int up_direction, int trigg
       }
       break;
     case ST_WAITING:
-#if 1
+      // Store data level bitfield (remember only last 2 states)
+      // T_LEVEL_UNDEF mode bit drop after 2 shifts
+#if 0
       if (rssi < trigger_lvl) {
         data_level = ((data_level<<1) | (T_LEVEL_BELOW))&(T_LEVEL_CLEAN);
       } else {
@@ -542,14 +597,15 @@ void SI4432_Fill(int s, int start)
   systime_t measure = chVTGetSystemTimeX();
 //  __disable_irq();
 #if 1
-  SPI2_CLK_LOW;
-  int i = start;
+  int stop = sweep_points - start;
+  int i = 0;
+  uint8_t *buf = &age[start];
   do {
     palClearPad(GPIOC, sel);
     shiftOut(SI4432_REG_RSSI);
-    age[i]=(char)shiftIn();
+    buf[i]=shiftIn();
     palSetPad(GPIOC, sel);
-    if (++i >= sweep_points) break;
+    if (++i >=stop) break;
     if (t)
       my_microsecond_delay(t);
   } while(1);
@@ -565,7 +621,7 @@ void SI4432_Fill(int s, int start)
 #endif
 
 #define MINIMUM_WAIT_FOR_RSSI   280
-int SI4432_offset_delay = 300;
+uint32_t SI4432_offset_delay = 300;
 
 pureRSSI_t getSI4432_RSSI_correction(void){
   return SI4432_RSSI_correction;
@@ -575,7 +631,6 @@ pureRSSI_t SI4432_RSSI(uint32_t i, int s)
 {
   (void) i;
   int32_t RSSI_RAW;
-  (void) i;
   // SEE DATASHEET PAGE 61
 #ifdef USE_SI4463           // Not used!!!!!!!
   if (SI4432_Sel == 2) {
@@ -629,7 +684,7 @@ pureRSSI_t SI4432_RSSI(uint32_t i, int s)
   return RSSI_RAW;
 }
 
-static uint8_t SI4432_init_script[] =
+static const uint8_t SI4432_init_script[] =
 {
   SI4432_INT_ENABLE1, 0x0,
   SI4432_INT_ENABLE2, 0x0,
@@ -655,7 +710,7 @@ static uint8_t SI4432_init_script[] =
 void SI4432_Sub_Init(void)
 {
   SI4432_Reset();
-  uint8_t *p = SI4432_init_script;
+  const uint8_t *p = SI4432_init_script;
   while (*p) {
     uint8_t r = *p++;
     uint8_t v = *p++;
@@ -1079,7 +1134,7 @@ void ADF4351_prep_frequency(int channel, unsigned long freq, int drive)  // freq
     MOD = (PFDRFout[channel] / OutputChannelSpacing) + 0.01;
 //    MOD = 3125;
     FRACF = (((RFout * OutputDivider) / PFDRFout[channel]) - INTA) * MOD;
-    FRAC = round(FRACF);
+    FRAC = roundf(FRACF);
 
   while (FRAC > 4095 || MOD > 4095) {
     FRAC = FRAC >> 1;

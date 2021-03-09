@@ -35,7 +35,7 @@
 #endif
 #endif
 // uint8_t dirty = true;
-int scandirty = true;
+uint8_t scandirty = true;
 
 setting_t setting;
 freq_t frequencies[POINTS_COUNT];
@@ -74,50 +74,51 @@ static freq_t real_old_freq[4] = { 0, 0, 0, 0};
 const float si_drive_dBm []     = {-41, -30, -21, -17, -12, -11, -10, -8.5, -7.5, -6.5, -5.5, -4.5, -3.5, -3 ,  -2,  -1.5, -1, -0.5, 0};
 const float adf_drive_dBm[]     = {-15,-12,-9,-6};
 const uint8_t drive_register[]  = {0,   1,   2,   3,   4,   5,  6,   6,    8,    9,    10,   11,   12,   13,   14,  15,  16,  17,   18};
-
 float *drive_dBm = (float *) adf_drive_dBm;
-
 #else
 const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0, 3, 6, 9, 12, 16};
 #endif
 
 #ifdef TINYSA4
-#define SWITCH_ATTENUATION  (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 0 : 37 - config.switch_offset)
+#define SWITCH_ATTENUATION  ((setting.mode == M_GENHIGH && config.high_out_adf4350) ? 40 : 37 - config.switch_offset)
 //#define POWER_OFFSET    -18             // Max level with all enabled
 //#define POWER_RANGE     70
-#define MAX_DRIVE   (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 3 : 18)
-#define MIN_DRIVE   (setting.mode == M_GENHIGH && config.high_out_adf4350 ? 0: 2)
+#define MAX_DRIVE   ((setting.mode == M_GENHIGH && config.high_out_adf4350 ) ? 3 : 18)
+#define MIN_DRIVE   ((setting.mode == M_GENHIGH && config.high_out_adf4350 ) ? 0: 2)
 //#define SL_GENHIGH_LEVEL_MIN    -15
 //#define SL_GENHIGH_LEVEL_RANGE    9
 
-#define SL_GENHIGH_LEVEL_MIN    drive_dBm[MIN_DRIVE]
-#define SL_GENHIGH_LEVEL_RANGE  (drive_dBm[MAX_DRIVE] - drive_dBm[MIN_DRIVE])
+#define SL_GENHIGH_LEVEL_MIN    (drive_dBm[MIN_DRIVE] - (config.high_out_adf4350 ? 0: 37 - config.switch_offset))
 #define SL_GENHIGH_LEVEL_MAX    drive_dBm[MAX_DRIVE]
 
 #define SL_GENLOW_LEVEL_MIN    -104
-#define SL_GENLOW_LEVEL_RANGE   90
+#define SL_GENLOW_LEVEL_MAX   -14
 
 
 #else
-#define SWITCH_ATTENUATION  (30 - config.switch_offset)
+#define SWITCH_ATTENUATION  (29 - config.switch_offset)
 #define POWER_OFFSET    15
 #define MAX_DRIVE   (setting.mode == M_GENHIGH ? 15 : 11)
 #define MIN_DRIVE   8
 #define SL_GENHIGH_LEVEL_MIN    -38
-#define SL_GENHIGH_LEVEL_RANGE    54
+#define SL_GENHIGH_LEVEL_MAX    16
 #define SL_GENLOW_LEVEL_MIN    -76
-#define SL_GENLOW_LEVEL_RANGE   70
+#define SL_GENLOW_LEVEL_MAX   -7
 #endif
 
 #define BELOW_MAX_DRIVE(X) (drive_dBm[X] - drive_dBm[MAX_DRIVE])
 
 #define RECEIVE_SWITCH_ATTENUATION  21      // TODO differentiate for tinySA3 and tinySA4
 
+float level_min;
+float level_max;
+float level_range;
+
 
 //int setting.refer = -1;  // Off by default
-const int reffer_freq[] = {30000000, 15000000, 10000000, 4000000, 3000000, 2000000, 1000000};
+const uint32_t reffer_freq[] = {30000000, 15000000, 10000000, 4000000, 3000000, 2000000, 1000000};
 
-int in_selftest = false;
+uint8_t in_selftest = false;
 
 void update_min_max_freq(void)
 {
@@ -180,7 +181,6 @@ void reset_settings(int m)
   setting.attenuate_x2 = 0;         // These should be initialized consistently
   setting.rx_drive=MAX_DRIVE;              // And this
   setting.atten_step = 0;           // And this, only used in low output mode
-  setting.level =  level_max();     // This is the level with above settings.
   setting.rbw_x10 = 0;
   setting.average = 0;
 #ifdef TINYSA4  
@@ -288,6 +288,9 @@ void reset_settings(int m)
 #endif
     setting.correction_frequency = config.low_correction_frequency;
     setting.correction_value = config.low_correction_value;
+    level_min = SL_GENLOW_LEVEL_MIN + config.low_level_output_offset;
+    level_max = SL_GENLOW_LEVEL_MAX + config.low_level_output_offset;
+    level_range = level_max - level_min;
     break;
   case M_HIGH:
     set_sweep_frequency(ST_START, minFreq);
@@ -314,8 +317,12 @@ void reset_settings(int m)
     setting.step_delay_mode = SD_FAST;
     setting.correction_frequency = config.high_correction_frequency;
     setting.correction_value = config.high_correction_value;
+    level_min = SL_GENHIGH_LEVEL_MIN + config.high_level_output_offset;
+    level_max = SL_GENHIGH_LEVEL_MAX + config.high_level_output_offset;
+    level_range = level_max - level_min;
     break;
   }
+  setting.level =  level_max;     // This is the level with above settings.
   for (uint8_t i = 0; i< MARKERS_MAX; i++) {
     markers[i].enabled = M_DISABLED;
     markers[i].mtype = M_NORMAL;
@@ -558,7 +565,7 @@ void set_modulation(int m)
 
 void set_modulation_frequency(int f)
 {
-  if (50 <= f && f <= 6000) {
+  if (50 <= f && f <= 7000) {
     setting.modulation_frequency = f;
     dirty = true;
   }
@@ -622,6 +629,7 @@ void set_auto_reflevel(bool v)
   setting.auto_reflevel = v;
 }
 
+#if 0
 float level_min(void)
 {
   int l;
@@ -635,26 +643,24 @@ float level_min(void)
 float level_max(void)
 {
   if (setting.mode == M_GENLOW)
-    return SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE + config.low_level_output_offset;
+    return SL_GENLOW_LEVEL_MAX + config.low_level_output_offset;
   else
-    return SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE + config.high_level_output_offset;
+    return SL_GENHIGH_LEVEL_MAX + config.high_level_output_offset;
 }
 
 float level_range(void)
 {
   int r;
-  if (setting.mode == M_GENLOW)
-    r = SL_GENLOW_LEVEL_RANGE ;
-  else
-    r = SL_GENHIGH_LEVEL_RANGE;
+  r = level_max() - level_min();
   return r;
 }
+#endif
 
 static pureRSSI_t get_signal_path_loss(void){
 #ifdef TINYSA4
   if (setting.mode == M_LOW)
-    return float_TO_PURE_RSSI(-4);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
-  return float_TO_PURE_RSSI(+19);          // Loss in dB (+ is gain)
+    return float_TO_PURE_RSSI(+3);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
+  return float_TO_PURE_RSSI(+29);          // Loss in dB (+ is gain)
 #else
   if (setting.mode == M_LOW)
     return float_TO_PURE_RSSI(-5.5);      // Loss in dB, -9.5 for v0.1, -12.5 for v0.2
@@ -665,10 +671,12 @@ static pureRSSI_t get_signal_path_loss(void){
 void set_level(float v)     // Set the output level in dB  in high/low output
 {
   if (setting.mode == M_GENHIGH) {
+    v -= config.high_level_output_offset;
     if (v < SL_GENHIGH_LEVEL_MIN)
       v = SL_GENHIGH_LEVEL_MIN;
-    if (v > SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE)
-      v = SL_GENHIGH_LEVEL_MIN + SL_GENHIGH_LEVEL_RANGE;
+    if (v > SL_GENHIGH_LEVEL_MAX)
+      v = SL_GENHIGH_LEVEL_MAX;
+    v += config.high_level_output_offset;
 #if 0
     unsigned int d = MIN_DRIVE;
     v = v - config.high_level_output_offset;
@@ -680,10 +688,12 @@ void set_level(float v)     // Set the output level in dB  in high/low output
     set_lo_drive(d);
 #endif
   } else {                  // This MUST be low output level
+    v -= config.low_level_output_offset;
     if (v < SL_GENLOW_LEVEL_MIN)
       v = SL_GENLOW_LEVEL_MIN;
-    if (v > SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE)
-      v = SL_GENLOW_LEVEL_MIN + SL_GENLOW_LEVEL_RANGE;
+    if (v > SL_GENLOW_LEVEL_MAX)
+      v = SL_GENLOW_LEVEL_MAX;
+    v += config.low_level_output_offset;
 //    set_attenuation(setting.level - config.low_level_output_offset);
   }
   setting.level = v;
@@ -708,7 +718,7 @@ float get_attenuation(void)
 {
   float actual_attenuation = setting.attenuate_x2 / 2.0;
   if (setting.mode == M_GENLOW) {
-    return (float)( level_max() - actual_attenuation  + BELOW_MAX_DRIVE(setting.rx_drive) - ( setting.atten_step ? SWITCH_ATTENUATION : 0) );
+    return (float)( level_max - actual_attenuation  + BELOW_MAX_DRIVE(setting.rx_drive) - ( setting.atten_step ? SWITCH_ATTENUATION : 0) );
   } else if (setting.atten_step) {
     if (setting.mode == M_LOW)
       return actual_attenuation + RECEIVE_SWITCH_ATTENUATION;
@@ -722,7 +732,7 @@ void set_attenuation(float a)       // Is used both only in  high/low input mode
 {
 #if 0
   if (setting.mode == M_GENLOW) {
-    a = a - level_max();               // Move to zero for max power
+    a = a - level_max;               // Move to zero for max power
     if (a > 0)
       a = 0;
     if( a <  - SWITCH_ATTENUATION) {
@@ -914,7 +924,7 @@ void set_harmonic(int h)
 void set_step_delay(int d)                  // override RSSI measurement delay or set to one of three auto modes
 {
 
-  if ((3 <= d && d < 100) || d > 30000)         // values 0 (normal scan), 1 (precise scan) and 2(fast scan) have special meaning and are auto calculated
+  if ((3 <= d && d < 10) || d > 30000)         // values 0 (normal scan), 1 (precise scan) and 2(fast scan) have special meaning and are auto calculated
     return;
   if (d <3) {
     setting.step_delay_mode = d;
@@ -995,10 +1005,11 @@ void auto_set_AGC_LNA(int auto_set, int agc)                                    
     v = 0x60; // Enable AGC and disable LNA
   else
     v = 0x40+agc; // Disable AGC and enable LNA
-  if (SI4432_old_v[MODE_SELECT(setting.mode)] != v) {
+  int idx = MODE_SELECT(setting.mode) == SI4432_RX ? 0 : 1;
+  if (SI4432_old_v[idx] != v) {
     SI4432_Sel = MODE_SELECT(setting.mode);
     SI4432_Write_Byte(SI4432_AGC_OVERRIDE, v);
-    SI4432_old_v[MODE_SELECT(setting.mode)] = v;
+    SI4432_old_v[idx] = v;
   }
 #ifdef __SI4463__
   unsigned char v;
@@ -1021,7 +1032,8 @@ void set_AGC_LNA(void) {
   if (S_STATE(setting.agc)) v |= 0x20;
   if (S_STATE(setting.lna)) v |= 0x10;
   SI4432_Write_Byte(SI4432_AGC_OVERRIDE, v);
-  SI4432_old_v[MODE_SELECT(setting.mode)] = v;
+  int idx = MODE_SELECT(setting.mode) == SI4432_RX ? 0 : 1;
+  SI4432_old_v[idx] = v;
 }
 #endif
 
@@ -1062,7 +1074,7 @@ void set_unit(int u)
     if (S_IS_AUTO(setting.lna))
       setting.lna = S_AUTO_OFF;
   } else {
-    r = 10 * round((r*1.2)/10.0);
+    r = 10 * roundf((r*1.2)/10.0);
     set_reflevel(r);
     set_scale(10);
     if (S_IS_AUTO(setting.agc))
@@ -1171,8 +1183,8 @@ void set_offset(float offset)
 {
   setting.offset = offset;
   int min,max;
-  min = level_min();
-  max = min + level_range();
+  min = level_min;
+  max = min + level_range;
   plot_printf(low_level_help_text, sizeof low_level_help_text, "%+d..%+d", min + (int)offset, max + (int)offset);
   redraw_request|=REDRAW_AREA;
   dirty = true;             // No HW update required, only status panel refresh but need to ensure the cached value is updated in the calculation of the RSSI
@@ -1226,7 +1238,60 @@ void set_fast_speedup(int s)
   dirty = true;
 }
 
-void calculate_step_delay(void)
+//
+// Table for auto set sweep step/offset delays from RBW
+//
+#ifdef __SI4432__
+static const struct {
+  uint16_t rbw_x10;
+  uint16_t step_delay;
+  uint32_t offset_delay;
+} step_delay_table[]={
+#if 1
+//  RBWx10 step_delay  offset_delay
+  {  1910,       300,         100},
+  {  1420,       350,         100},
+  {   750,       450,         100},
+  {   560,       650,         100},
+  {   370,       700,         200},
+  {   180,      1100,         300},
+  {    90,      1700,         400},
+  {    50,      3300,         800},
+  {     0,      6400,        1600},
+#else
+  {  1910,       280,         100},
+  {  1420,       350,         100},
+  {   750,       450,         100},
+  {   560,       650,         100},
+  {   370,       700,         100},
+  {   180,      1100,         200},
+  {    90,      1700,         400},
+  {    50,      3300,         400},
+  {     0,      6400,        1600},
+#endif
+};
+#endif
+
+#ifdef __SI4463__
+static const struct {
+  uint16_t rbw_x10;
+  uint16_t step_delay;
+  uint16_t offset_delay;
+  uint16_t spur_div_1000;
+} step_delay_table[]={
+//  RBWx10 step_delay  offset_delay spur_gate (value divided by 1000)
+  {  6000,        80,           50,      400},
+  {  3000,        80,           50,      200},
+  {  1000,       100,          100,      100},
+  {   300,       400,          120,      100},
+  {   100,       400,          120,      100},
+  {    30,       900,          300,      100},
+  {    10,      3000,          600,      100},
+  {     0,      9000,         3000,      100}
+};
+#endif
+
+static void calculate_step_delay(void)
 {
   if (setting.step_delay_mode == SD_MANUAL || setting.step_delay != 0) {        // The latter part required for selftest 3
     SI4432_step_delay = setting.step_delay;
@@ -1237,38 +1302,21 @@ void calculate_step_delay(void)
     if (setting.frequency_step == 0) {            // zero span mode, not dependent on selected RBW
       SI4432_step_delay = 0;
     } else {
+      // Search index in table depend from RBW
+      uint16_t i=0;
+
+
+      for (i=0;i<ARRAY_COUNT(step_delay_table)-1;i++)
+        if (actual_rbw_x10 >= step_delay_table[i].rbw_x10)
+          break;
 #ifdef __SI4432__
-#if 1       // Table for double offset delay
-      if (actual_rbw_x10 >= 1910)      { SI4432_step_delay =  300; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 1420) { SI4432_step_delay =  350; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 750)  { SI4432_step_delay =  450; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 560)  { SI4432_step_delay =  650; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 370)  { SI4432_step_delay =  700; SI4432_offset_delay = 200; }
-      else if (actual_rbw_x10 >= 180)  { SI4432_step_delay = 1100; SI4432_offset_delay = 300; }
-      else if (actual_rbw_x10 >=  90)  { SI4432_step_delay = 1700; SI4432_offset_delay = 400; }
-      else if (actual_rbw_x10 >=  50)  { SI4432_step_delay = 3300; SI4432_offset_delay = 800; }
-      else                             { SI4432_step_delay = 6400; SI4432_offset_delay =1600; }
-#else
-      if (actual_rbw_x10 >= 1910)      { SI4432_step_delay =  280; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 1420) { SI4432_step_delay =  350; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 750)  { SI4432_step_delay =  450; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 560)  { SI4432_step_delay =  650; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 370)  { SI4432_step_delay =  700; SI4432_offset_delay = 100; }
-      else if (actual_rbw_x10 >= 180)  { SI4432_step_delay = 1100; SI4432_offset_delay = 200; }
-      else if (actual_rbw_x10 >=  90)  { SI4432_step_delay = 1700; SI4432_offset_delay = 400; }
-      else if (actual_rbw_x10 >=  50)  { SI4432_step_delay = 3300; SI4432_offset_delay = 400; }
-      else                             { SI4432_step_delay = 6400; SI4432_offset_delay =1600; }
-#endif
+      SI4432_step_delay   = step_delay_table[i].step_delay;
+      SI4432_offset_delay = step_delay_table[i].offset_delay;
 #endif
 #ifdef __SI4463__
-      if      (actual_rbw_x10 >= 6000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 400000; }
-      else if (actual_rbw_x10 >= 3000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 200000; }
-      else if (actual_rbw_x10 >= 1000) { SI4432_step_delay = 400; SI4432_offset_delay = 100; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 300)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 100)  { SI4432_step_delay = 400; SI4432_offset_delay = 120; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 30)   { SI4432_step_delay = 900; SI4432_offset_delay = 300; spur_gate = 100000; }
-      else if (actual_rbw_x10 >= 10)   { SI4432_step_delay = 3000; SI4432_offset_delay = 600; spur_gate = 100000; }
-      else                             { SI4432_step_delay = 9000; SI4432_offset_delay =3000; spur_gate = 100000; }
+      SI4432_step_delay   = step_delay_table[i].step_delay;
+      SI4432_offset_delay = step_delay_table[i].offset_delay;
+      spur_gate           = step_delay_table[i].spur_div_1000 * 1000;
 #endif
       if (setting.step_delay_mode == SD_PRECISE)    // In precise mode wait twice as long for RSSI to stabilize
         SI4432_step_delay += (SI4432_step_delay>>2) ;
@@ -1280,7 +1328,7 @@ void calculate_step_delay(void)
   }
 }
 
-void apply_settings(void)       // Ensure all settings in the setting structure are translated to the right HW setup
+static void apply_settings(void)       // Ensure all settings in the setting structure are translated to the right HW setup
 {
   set_switches(setting.mode);
 #ifdef __PE4302__
@@ -1320,7 +1368,7 @@ static const float correction_value[CORRECTION_POINTS] =
 static int32_t scaled_correction_multi[CORRECTION_POINTS];
 static int32_t scaled_correction_value[CORRECTION_POINTS];
 
-void calculate_correction(void)
+static void calculate_correction(void)
 {
   scaled_correction_value[0] = setting.correction_value[0]  * (1 << (SCALE_FACTOR));
   for (int i = 1; i < CORRECTION_POINTS; i++) {
@@ -1868,13 +1916,13 @@ void interpolate_maximum(int m)
   markers[m].frequency = frequencies[idx];
   if (idx > 0 && idx < sweep_points-1)
   {
+    const int32_t delta_Hz = (int64_t)frequencies[idx + 0] - frequencies[idx + 1];
     const float y1         = actual_t[idx - 1];
     const float y2         = actual_t[idx + 0];
     const float y3         = actual_t[idx + 1];
-    const float d          = 0.5f * (y1 - y3) / ((y1 - (2 * y2) + y3) + 1e-12f);
+    const float d          = abs(delta_Hz) * 0.5f * (y1 - y3) / ((y1 - (2 * y2) + y3) + 1e-12f);
     //const float bin      = (float)idx + d;
-    const int32_t delta_Hz = abs((int64_t)frequencies[idx + 0] - frequencies[idx + 1]);
-    markers[m].frequency   += (int32_t)(delta_Hz * d);
+    markers[m].frequency   += d;
   }
 }
 
@@ -2260,10 +2308,10 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       else
         ls -= 0.5;
       float a = ((int)((setting.level + ((float)i / sweep_points) * ls)*2.0)) / 2.0;
-      a += PURE_TO_float(get_frequency_correction(f)) - config.low_level_output_offset;
+      a += PURE_TO_float(get_frequency_correction(f));
       if (a != old_a) {
         old_a = a;
-        a = a - level_max();                 // convert to all settings maximum power output equals a = zero
+        a = a - level_max;                 // convert to all settings maximum power output equals a = zero
         if (a < -SWITCH_ATTENUATION) {
           a = a + SWITCH_ATTENUATION;
 #ifdef TINYSA3
@@ -2304,14 +2352,50 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       }
     }
     else if (setting.mode == M_GENHIGH) {
+      float a = setting.level - level_max;
+      if (a <= -SWITCH_ATTENUATION) {
+        setting.atten_step = true;
+        a = a + SWITCH_ATTENUATION;
+#ifdef TINYSA3
+        SI4432_Sel = SI4432_LO ;
+        set_switch_receive();
+#else
+        if (config.high_out_adf4350)
+          ADF4351_enable_aux_out(false);
+        else
+          enable_rx_output(false);
+#endif
+      } else {
+        setting.atten_step = false;
+#ifdef TINYSA3
+        SI4432_Sel = SI4432_LO ;
+        set_switch_transmit();
+#else
+        if (config.high_out_adf4350)
+          ADF4351_enable_aux_out(true);
+        else
+          enable_rx_output(true);
+#endif
+      }
+
       unsigned int d = MIN_DRIVE;
-      float v = setting.level - config.high_level_output_offset;
-      while (drive_dBm[d] < v && d < MAX_DRIVE)       // Find level equal or above requested level
+      while (drive_dBm[d] - level_max < a && d < MAX_DRIVE)       // Find level equal or above requested level
         d++;
       //    if (d == 8 && v < -12)  // Round towards closest level
       //      d = 7;
-      setting.level = drive_dBm[d] + config.high_level_output_offset;
-      set_lo_drive(d);
+      setting.level = drive_dBm[d] + config.high_level_output_offset - (setting.atten_step ? SWITCH_ATTENUATION : 0);
+
+#ifdef __SI4432__
+        SI4432_Sel = SI4432_LO ;
+        SI4432_Drive(d);
+#endif
+#ifdef TINYSA4
+        if (config.high_out_adf4350)
+          ADF4351_aux_drive(d);
+        else
+          SI4463_set_output_level(d);
+#endif
+
     }
   }
 #ifdef __SI4432__
@@ -2433,8 +2517,10 @@ modulation_again:
       goto skip_LO_setting;                                             // No more LO changes required, save some time and jump over the code
 
     freq_t local_IF;
+#ifdef __SPUR__
     spur_second_pass = false;
     again:                                                              // Spur reduction jumps to here for second measurement
+#endif
 
     local_IF=0;                                                         // to get rid of warning
 #ifdef TINYSA4
@@ -2575,19 +2661,25 @@ modulation_again:
 #define TXCO_DIV3   10000000
 
         if (setting.R == 0) {
-          if (lf < LOW_MAX_FREQ && lf >= TXCO_DIV3) {
+          if (lf < LOW_MAX_FREQ && lf >= TXCO_DIV3 && MODE_INPUT(setting.mode)) {
             freq_t tf = ((lf + actual_rbw_x10*100) / TCXO) * TCXO;
             if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100) {
               ADF4351_R_counter(6);
             } else {
-              freq_t tf = ((lf + actual_rbw_x10*100) / TXCO_DIV3) * TXCO_DIV3;
-              if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100)
-                ADF4351_R_counter(4);
-              else
-                ADF4351_R_counter(3);
+              if (setting.frequency_step < 100000) {
+                freq_t tf = ((lf + actual_rbw_x10*100) / TXCO_DIV3) * TXCO_DIV3;
+                if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100)
+                  ADF4351_R_counter(4);
+                else
+                  ADF4351_R_counter(3);
+              } else
+                ADF4351_R_counter(1);
             }
           } else
-            ADF4351_R_counter(3);
+            if (setting.frequency_step < 100000)
+              ADF4351_R_counter(3);
+            else
+              ADF4351_R_counter(1);
         }
         else
           ADF4351_R_counter(setting.R);
@@ -4173,8 +4265,7 @@ common_silent:
   draw_cal_status();
 }
 
-extern void menu_autosettings_cb(int item);
-
+extern void menu_autosettings_cb(int item, uint16_t data);
 
 int last_spur = 0;
 int add_spur(int f)
@@ -4207,7 +4298,7 @@ void self_test(int test)
     }
     reset_settings(M_LOW);                      // Make sure we are in a defined state
     in_selftest = true;
-    menu_autosettings_cb(0);
+    menu_autosettings_cb(0, 0);
     for (uint16_t i=0; i < TEST_COUNT; i++) {          // All test cases waiting
       if (test_case[i].kind == TC_END)
         break;
@@ -4356,6 +4447,8 @@ void self_test(int test)
       setting.repeat = 20;
 #endif
       setting.step_delay = setting.step_delay * 5 / 4;
+      if (setting.step_delay < 1000)
+        setting.step_delay = 1000;
       setting.offset_delay = setting.step_delay ;
       setting.rbw_x10 = force_rbw(j);
 
@@ -4508,9 +4601,9 @@ void reset_calibration(void)
 #define CALIBRATE_RBWS  1
 const int power_rbw [5] = { 100, 300, 30, 10, 3 };
 
+#ifdef __CALIBRATE__
 void calibrate(void)
 {
-#ifdef __CALIBRATE__
   int local_test_status;
   int old_sweep_points = setting._sweep_points;
   in_selftest = true;
@@ -4591,8 +4684,8 @@ quit:
   sweep_mode = SWEEP_ENABLE;
   set_refer_output(-1);
   reset_settings(M_LOW);
-#endif
 }
+#endif
 
 #pragma GCC pop_options
 

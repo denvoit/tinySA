@@ -483,7 +483,7 @@ void SI4432_Set_Frequency ( freq_t Freq ) {
   } else {
 #endif
 #if 0       // Do not use multi byte write
-    SI4432_Write_Byte ( 0x75, Freq_Band );                          // Freq band must be written first !!!!!!!!!!!!
+    SI4432_Write_Byte(SI4432_FREQBAND, Freq_Band);                          // Freq band must be written first !!!!!!!!!!!!
     SI4432_Write_Byte(SI4432_FREQCARRIER_H, (Carrier>>8) & 0xFF );
     SI4432_Write_Byte(SI4432_FREQCARRIER_L, Carrier & 0xFF  );
 #else
@@ -1937,9 +1937,9 @@ int16_t Si446x_RSSI(void)
       my_microsecond_delay(SI4432_step_delay * ((setting.R == 0 && old_R > 5 ) ? 8 : 1));
       ADF4351_frequency_changed = false;
       SI4463_frequency_changed = false;
+      SI4463_offset_changed = false;
     } else if (SI4432_offset_delay && SI4463_offset_changed) {
       my_microsecond_delay(SI4432_offset_delay);
-      ADF4351_frequency_changed = false;
       SI4463_offset_changed = false;
     }
 #define SAMPLE_COUNT 1

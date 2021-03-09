@@ -90,7 +90,7 @@ int generic_option_cmd( const char *cmd, const char *cmd_list, int argc, char *a
   return m;
 }
 
-
+#ifdef __SPUR__
 VNA_SHELL_FUNCTION(cmd_spur)
 {
 //  static const char cmd[] = "off|on";
@@ -109,6 +109,7 @@ VNA_SHELL_FUNCTION(cmd_spur)
     redraw_request |= REDRAW_CAL_STATUS | REDRAW_AREA;
   }
 }
+#endif
 
 #ifdef TINYSA4
 VNA_SHELL_FUNCTION(cmd_lna)
@@ -144,19 +145,6 @@ VNA_SHELL_FUNCTION(cmd_ultra)
 
 VNA_SHELL_FUNCTION(cmd_output)
 {
-#if 0
-  if (argc != 1) {
-  usage:
-    shell_printf("usage: output on|off\r\n");
-    return;
-  }
-  if (strcmp(argv[0],"on") == 0) {
-    setting.mute = false;
-  } else if (strcmp(argv[0],"off") == 0) {
-    setting.mute = true;
-  } else
-    goto usage;
-#endif
   int m = generic_option_cmd("output", "on|off", argc, argv[0]);
   if (m>=0) {
     setting.mute = m;
@@ -166,18 +154,16 @@ VNA_SHELL_FUNCTION(cmd_output)
 
 VNA_SHELL_FUNCTION(cmd_load)
 {
-  if (argc != 1) {
-  usage:
-    shell_printf("usage: load 0..4\r\n");
+  if (argc != 1)
+    goto usage;
+  uint16_t a = my_atoui(argv[0]);
+  if (a <= 4) {
+    caldata_recall(a);
     return;
   }
-  int a = my_atoi(argv[0]);
-  if (0 <= a && a <= 4) {
-    caldata_recall(a);
-  } else
-    goto usage;
+usage:
+  shell_printf("usage: load 0..4\r\n");
 }
-
 
 VNA_SHELL_FUNCTION(cmd_attenuate)
 {
@@ -186,7 +172,7 @@ VNA_SHELL_FUNCTION(cmd_attenuate)
     shell_printf("usage: attenuate 0..31|auto\r\n");
     return;
   }
-  if (strcmp(argv[0],"auto") == 0) {
+  if (get_str_index(argv[0],"auto") == 0) {
     if (!setting.auto_attenuation)
       set_auto_attenuation();
   } else {
@@ -249,6 +235,8 @@ VNA_SHELL_FUNCTION(cmd_levelchange)
 
 VNA_SHELL_FUNCTION(cmd_leveloffset)
 {
+  //                                     0    1      2
+  static const char cmd_mode_list[] = "low|high|switch";
   if (argc == 0) {
     const char *p = "leveloffset %s %.1f\r\n";
     shell_printf(p, "low",          config.low_level_offset);
@@ -257,30 +245,25 @@ VNA_SHELL_FUNCTION(cmd_leveloffset)
     shell_printf(p, "high output",  config.high_level_output_offset);
     shell_printf(p, "switch",       config.switch_offset);
     return;
-  } else if (argc == 2) {
-    float v = my_atof(argv[1]);
-    if (strcmp(argv[0],"low") == 0)
-      config.low_level_offset = v;
-    else if (strcmp(argv[0],"high") == 0)
-      config.high_level_offset = v;
-    else if (strcmp(argv[0],"switch") == 0)
-      config.switch_offset = v;
-    else
-      goto usage;
-    dirty = true;
-  } else if (argc == 3 && strcmp(argv[1],"output") == 0) {
-    float v = my_atof(argv[2]);
-    if (strcmp(argv[0],"low") == 0)
-      config.low_level_output_offset = v;
-    else if (strcmp(argv[0],"high") == 0)
-      config.high_level_output_offset = v;
-    else
-      goto usage;
-    dirty = true;
-  } else {
-  usage:
-    shell_printf("leveloffset [low|high|switch] {output} [-20..+20]\r\n");
   }
+  int mode = get_str_index(argv[0], cmd_mode_list);
+  float v;
+  if (argc == 2)
+    v = my_atof(argv[1]);
+  else if (argc == 3 && get_str_index(argv[1], "output") == 0)
+    v = my_atof(argv[2]);
+  else
+    goto usage;
+  switch (mode){
+    case 0: config.low_level_offset = v; break;
+    case 1: config.high_level_offset = v; break;
+    case 2: config.switch_offset = v; break;
+    default: goto usage;
+  }
+  dirty = true;
+  return;
+usage:
+  shell_printf("leveloffset [%s] {output} [-20..+20]\r\n", cmd_mode_list);
 }
 
 VNA_SHELL_FUNCTION(cmd_deviceid)
@@ -343,6 +326,16 @@ VNA_SHELL_FUNCTION(cmd_if)
       goto usage;
     setting.auto_IF = false;
     set_IF(a);
+  }
+}
+
+VNA_SHELL_FUNCTION(cmd_zero)
+{
+  if (argc != 1) {
+    shell_printf("usage: zero {level}\r\n%ddBm\r\n", config.ext_zero_level);
+    return;
+  } else {
+    config.ext_zero_level = my_atoi(argv[0]);
   }
 }
 
@@ -694,7 +687,7 @@ void sweep_remote(void)
   for (i = 0; i <= step; i++, f+=delta) {
     if (operation_requested)
       break;
-    int val = perform(false, i, f, false) + float_TO_PURE_RSSI(EXT_ZERO_LEVEL);
+    int val = perform(false, i, f, false) + float_TO_PURE_RSSI(config.ext_zero_level);
     streamPut(shell_stream, 'x');
     streamPut(shell_stream, (uint8_t)(val & 0xFF));
     streamPut(shell_stream, (uint8_t)((val>>8) & 0xFF));
@@ -781,7 +774,7 @@ VNA_SHELL_FUNCTION(cmd_correction)
     }
     return;
   }
-  if (argc == 1 && (strcmp(argv[0],"reset") == 0)) {
+  if (argc == 1 && (get_str_index(argv[0],"reset") == 0)) {
     for (int i=0; i<CORRECTION_POINTS; i++) {
       setting.correction_value[i] = 0.0;
     }
@@ -840,7 +833,7 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
   dirty = true;
 
   for (uint32_t i = 0; i<points; i++) {
-    int val = perform(false, i, start +(freq_t)(f_step * i), false) + float_TO_PURE_RSSI(EXT_ZERO_LEVEL);
+    int val = perform(false, i, start +(freq_t)(f_step * i), false) + float_TO_PURE_RSSI(config.ext_zero_level);
     if (operation_requested && SDU1.config->usbp->state != USB_ACTIVE) // break on operation in perform
       break;
     streamPut(shell_stream, 'x');
