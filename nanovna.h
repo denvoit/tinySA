@@ -205,7 +205,7 @@ void my_microsecond_delay(int t);
 float my_atof(const char *p);
 int shell_printf(const char *fmt, ...);
 #ifdef __REMOTE_DESKTOP__
-void send_region(const char *t, int x, int y, int w, int h);
+void send_region(const char *t, int16_t x, int16_t y, int16_t w, int16_t h);
 void send_buffer(uint8_t * buf, int s);
 #endif
 void set_marker_frequency(int m, freq_t f);
@@ -998,7 +998,7 @@ enum {W_OFF, W_SMALL, W_BIG};
 
 extern freq_t frequencies[POINTS_COUNT];
 extern const float unit_scale_value[];
-extern const char * const unit_scale_text[];
+extern const char  unit_scale_text[];
 #ifdef TINYSA4
 extern int debug_frequencies;
 #endif
@@ -1256,7 +1256,6 @@ typedef int16_t  pureRSSI_t;
 
 extern uint16_t actual_rbw_x10;
 
-int get_waterfall(void);
 void toggle_tracking(void);
 void toggle_hambands(void);
 void reset_calibration(void);

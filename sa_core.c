@@ -192,7 +192,6 @@ void reset_settings(int m)
   setting.auto_attenuation = false;
   setting.subtract_stored = false;
   setting.normalize_level = 0.0;
-  setting.waterfall = W_OFF;
 #ifdef TINYSA4
   setting.lo_drive=1;
 #else
@@ -1086,8 +1085,9 @@ void set_unit(int u)
   redraw_request|=REDRAW_AREA;
   //dirty = true;             // No HW update required, only status panel refresh
 }
-float const unit_scale_value[]={1,0.001,0.000001,0.000000001,0.000000000001};
-const char * const unit_scale_text[]= {"","m", "\035",     "n",        "p"};
+
+const float unit_scale_value[]={  1, 0.001,   0.000001, 0.000000001, 0.000000000001};
+const char  unit_scale_text[]= {' ',   'm', S_MICRO[0],         'n',            'p'};
 
 void user_set_reflevel(float level)
 {
@@ -1112,7 +1112,7 @@ void set_reflevel(float level)
 
   setting.unit_scale_index = 0;
   setting.unit_scale = 1.0;
-  while (UNIT_IS_LINEAR(setting.unit) && setting.unit_scale_index < sizeof(unit_scale_value)/sizeof(float) - 1) {
+  while (UNIT_IS_LINEAR(setting.unit) && setting.unit_scale_index < ARRAY_COUNT(unit_scale_value) - 1) {
     if (level > unit_scale_value[setting.unit_scale_index])
       break;
     setting.unit_scale_index++;
@@ -1431,7 +1431,7 @@ float min_level;
 freq_t peakFreq;
 int peakIndex;
 float temppeakLevel;
-int temppeakIndex;
+uint16_t temppeakIndex;
 // volatile int t;
 
 void setup_sa(void)
@@ -2994,11 +2994,11 @@ modulation_again:
 }
 
 #define MAX_MAX 4
-int16_t max_index[MAX_MAX];
-int16_t cur_max = 0;
+static uint16_t max_index[MAX_MAX];
+static uint16_t cur_max = 0;
 
-static int low_count = 0;
-static int sweep_counter = 0;           // Only used for HW refresh
+static uint8_t low_count = 0;
+static uint8_t sweep_counter = 0;           // Only used for HW refresh
 
 // main loop for measurement
 static bool sweep(bool break_on_operation)

@@ -1096,9 +1096,10 @@ static UI_FUNCTION_ADV_CALLBACK(menu_waterfall_acb){
   (void)item;
   (void)data;
   if (b){
-    b->icon = get_waterfall() ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    b->icon = setting.waterfall ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
     return;
   }
+  setting.waterfall++; if (setting.waterfall>W_BIG)setting.waterfall = W_OFF;
   toggle_waterfall();
   ui_mode_normal();
 }
@@ -2597,7 +2598,7 @@ redraw_cal_status:
     ili9341_drawstring("AUTO", x, y);
   }
 #endif
-  plot_printf(buf, BLEN, "%s%s",unit_scale_text[setting.unit_scale_index], unit);
+  plot_printf(buf, BLEN, "%c%s",unit_scale_text[setting.unit_scale_index], unit);
   y = add_quick_menu(buf, x, y, (menuitem_t *)menu_unit);
 
   // Scale
@@ -2605,10 +2606,10 @@ redraw_cal_status:
   ili9341_set_foreground(color);
 #if 1
   unsigned int i = 0;
-  while (i < sizeof(scale_value)/sizeof(float)) {
-    float t = (setting.scale/setting.unit_scale) / scale_value[i];;
+  while (i < ARRAY_COUNT(scale_value)) {
+    float t = (setting.scale/setting.unit_scale) / scale_value[i];
     if (t > 0.9 && t < 1.1){
-      plot_printf(buf, BLEN, "%s%s/",scale_vtext[i],unit_scale_text[setting.unit_scale_index]);
+      plot_printf(buf, BLEN, "%s%c/",scale_vtext[i],unit_scale_text[setting.unit_scale_index]);
       break;
     }
     i++;
@@ -2867,7 +2868,7 @@ redraw_cal_status:
   }
 
 //  ili9341_set_background(LCD_BG_COLOR);
-  if (!get_waterfall()) {               // Do not draw bottom level if in waterfall mode
+  if (!setting.waterfall) {               // Do not draw bottom level if in waterfall mode
     // Bottom level
     y = area_height + OFFSETY;
     if (rounding)
