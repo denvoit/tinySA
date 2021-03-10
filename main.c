@@ -896,16 +896,16 @@ VNA_SHELL_FUNCTION(cmd_capture)
   }
 }
 
-void send_region(const char *t, int x, int y, int w, int h)
+void send_region(const char *t, int16_t x, int16_t y, int16_t w, int16_t h)
 {
   if (SDU1.config->usbp->state == USB_ACTIVE) {
     shell_printf(t);
     struct {
       char new_str[2];
-      uint16_t x;
-      uint16_t y;
-      uint16_t w;
-      uint16_t h;
+      int16_t x;
+      int16_t y;
+      int16_t w;
+      int16_t h;
     } region={"\r\n", x,y,w,h};
     streamWrite(shell_stream, (void*)&region, sizeof(region));
   }
@@ -1060,6 +1060,7 @@ void load_LCD_properties(void)
 #endif
   setting.trace_scale = 10.0;
   setting.trace_refpos = 0;
+  setting.waterfall = W_OFF;
   memcpy(setting._trace, def_trace, sizeof(def_trace));
   memcpy(setting._markers, def_markers, sizeof(def_markers));
 #ifdef __VNA__
