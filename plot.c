@@ -1643,6 +1643,7 @@ toggle_waterfall(void)
   else if (setting.waterfall == W_BIG)    graph_bottom = BIG_WATERFALL;
   else /*if (setting.waterfall == W_OFF)*/graph_bottom = NO_WATERFALL;
   _grid_y = graph_bottom / NGRIDY;
+  area_height = AREA_HEIGHT_NORMAL;
   if (setting.waterfall != W_OFF){
     ili9341_set_background(LCD_BG_COLOR);
     ili9341_fill(OFFSETX, graph_bottom, LCD_WIDTH - OFFSETX, CHART_BOTTOM - graph_bottom);
