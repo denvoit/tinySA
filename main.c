@@ -2902,6 +2902,10 @@ int main(void)
 
 /* restore config */
   config_recall();
+  config.cor_am = 0;        // Should be removed from config
+  config.cor_nfm = 0;
+  config.cor_wfm = 0;
+
   if (caldata_recall(0) == -1) {
     load_LCD_properties();
   }
@@ -2927,7 +2931,7 @@ int main(void)
   setup_sa();
   set_sweep_points(POINTS_COUNT);
 
-#ifdef __AUDIO__
+  #ifdef __AUDIO__
 /*
  * I2S Initialize
  */
@@ -2966,16 +2970,6 @@ int main(void)
   ui_mode_normal();
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO-1, Thread1, NULL);
-
-  reset_settings(M_LOW);                        // Calibrate the modulation frequencies
-  set_mode(M_GENLOW);
-  set_sweep_frequency(ST_SPAN, (freq_t)0);
-  in_selftest = true;
-  calibrate_modulation(MO_AM, &config.cor_am);
-  calibrate_modulation(MO_NFM, &config.cor_nfm);
-  calibrate_modulation(MO_WFM, &config.cor_wfm);
-  in_selftest = false;
-  reset_settings(M_LOW);
 
 
   while (1) {

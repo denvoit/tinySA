@@ -1284,11 +1284,11 @@ static const struct {
   uint16_t spur_div_1000;
 } step_delay_table[]={
 //  RBWx10 step_delay  offset_delay spur_gate (value divided by 1000)
-  {  6000,        80,           50,      400},
+  {  6000,       300,           50,      400},
   {  3000,       400,           50,      200},
   {  1000,       400,          100,      100},
   {   300,       400,          120,      100},
-  {   100,       400,          120,      100},
+  {   100,       700,          120,      100},
   {    30,       900,          300,      100},
   {    10,      4000,          600,      100},
   {     0,      9000,         3000,      100}
@@ -2850,12 +2850,16 @@ modulation_again:
          spur = '!';
      }
      char shifted = ( LO_shifted ? '>' : ' ');
-      if (SDU1.config->usbp->state == USB_ACTIVE)
-        shell_printf ("%d:%c%c%c%cLO=%11.6Lq:%11.6Lq\tIF=%11.6Lq:%11.6Lq\tOF=%11.6q\tF=%11.6Lq:%11.6Lq\tD=%.2f:%.2f\r\n",
-                      i,   spur, shifted,(LO_mirrored ? 'm' : ' '), (LO_harmonic ? 'h':' ' ),
-                      old_freq[ADF4351_LO],real_old_freq[ADF4351_LO],
-                      old_freq[SI4463_RX], real_old_freq[SI4463_RX], (int32_t)real_offset, f_low, f_high , f_error_low, f_error_high);
-      osalThreadSleepMilliseconds(100);
+     if (SDU1.config->usbp->state == USB_ACTIVE)
+       shell_printf ("%d:%c%c%c%cLO=%11.6Lq:%11.6Lq\tIF=%11.6Lq:%11.6Lq\tOF=%11.6d\tF=%11.6Lq:%11.6Lq\tD=%.2f:%.2f %c%c%c\r\n",
+                     i,   spur, shifted,(LO_mirrored ? 'm' : ' '), (LO_harmonic ? 'h':' ' ),
+                     old_freq[ADF4351_LO],real_old_freq[ADF4351_LO],
+                     old_freq[SI4463_RX], real_old_freq[SI4463_RX], (int32_t)real_offset, f_low, f_high , f_error_low, f_error_high,
+                     (ADF4351_frequency_changed? 'A' : ' '),
+                     (SI4463_frequency_changed? 'S' : ' '),
+                     (SI4463_offset_changed? 'O' : ' ')
+                                          );
+     osalThreadSleepMilliseconds(100);
     }
 #endif
     // ------------------------- end of processing when in output mode ------------------------------------------------
@@ -2972,6 +2976,8 @@ modulation_again:
       int my_step_delay = SI4432_step_delay;
       if (f < 2000000 && actual_rbw_x10 == 3)
         my_step_delay = my_step_delay * 2;
+      if (SI4463_offset_changed)
+        my_step_delay = my_step_delay * 2;
       my_microsecond_delay(my_step_delay * ((setting.R == 0 && old_R > 5 ) ? 8 : 1));
       ADF4351_frequency_changed = false;
       SI4463_frequency_changed = false;
@@ -3080,6 +3086,12 @@ static bool sweep(bool break_on_operation)
 
   modulation_counter = 0;                                             // init modulation counter in case needed
   int refreshing = false;
+
+  if (MODE_OUTPUT(setting.mode) && config.cor_am == 0) {                          // Calibrate the modulation frequencies at first use
+    calibrate_modulation(MO_AM, &config.cor_am);
+    calibrate_modulation(MO_NFM, &config.cor_nfm);
+    calibrate_modulation(MO_WFM, &config.cor_wfm);
+  }
 
   if (dirty) {                    // Calculate new scanning solution
     sweep_counter = 0;
@@ -4704,9 +4716,12 @@ void calibrate_modulation(int modulation, int8_t *correction)
   if (*correction == 0) {
     setting.modulation = modulation;
     setting.modulation_frequency = 5000;
+    in_selftest = true;
     perform(false,0, 30000000, false);
     perform(false,1, 30000000, false);
+    in_selftest = false;
     *correction = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+    setting.modulation = M_OFF;
   }
 }
 
