@@ -1661,7 +1661,7 @@ disable_waterfall(void)
 void
 plot_init(void)
 {
-  toggle_waterfall();
+  force_set_markmap();
 }
 
 #pragma GCC pop_options
