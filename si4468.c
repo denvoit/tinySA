@@ -203,8 +203,8 @@ static void shiftOutBuf(uint8_t *buf, uint16_t size) {
 }
 #endif
 
-int SI4432_step_delay = 1500;
-int SI4432_offset_delay = 1500;
+uint32_t SI4432_step_delay = 1500;
+uint32_t SI4432_offset_delay = 1500;
 #define MINIMUM_WAIT_FOR_RSSI   280
 
 #ifdef __SI4432__
@@ -936,7 +936,7 @@ int debug = 0;
 ioline_t ADF4351_LE[2] = { LINE_LO_SEL, LINE_LO_SEL};
 //int ADF4351_Mux = 7;
 
-int ADF4351_frequency_changed = false;
+bool ADF4351_frequency_changed = false;
 
 //#define DEBUG(X) // Serial.print( X )
 //#define DEBUGLN(X) Serial.println( X )
@@ -964,7 +964,7 @@ volatile int64_t
 
 uint8_t OutputDivider; // Temp
 uint8_t lock=2; //Not used
-static int old_R = 0;
+int old_R = 0;
 
 // Lock = A4
 
@@ -1300,8 +1300,8 @@ void ADF4351_enable_out(int s)
 // ------------------------------ SI4463 -------------------------------------
 
 
-int SI4463_frequency_changed = false;
-int SI4463_offset_changed = false;
+bool SI4463_frequency_changed = false;
+bool SI4463_offset_changed = false;
 int SI4463_offset_value = 0;
 
 static int SI4463_band = -1;
@@ -1897,7 +1897,8 @@ again:
     SI4463_do_api(data, 1, data, 3);            // TODO no clear of interrups
     if (data[2] == 0) goto again;
     if (data[2] == 255) goto again;
-    age[i]=(char)data[2];
+    if (i >= 0)
+      age[i]=(char)data[2];                     // Skip first RSSI
     if (++i >= sweep_points) break;
     if (t)
       my_microsecond_delay(t);
@@ -1908,7 +1909,7 @@ again:
   __enable_irq();
 
   setting.measure_sweep_time_us = (chVTGetSystemTimeX() - measure)*100;
-  buf_index = start; // Is used to skip 1st entry during level triggering
+  buf_index = (start<=0 ? 0 : start); // Is used to skip 1st entry during level triggering
   buf_read = true;
 }
 #endif
@@ -1933,15 +1934,7 @@ int16_t Si446x_RSSI(void)
                        SI446X_CMD_GET_MODEM_STATUS,
                        0xFF
     };
-    if (SI4432_step_delay && (ADF4351_frequency_changed || SI4463_frequency_changed)) {
-      my_microsecond_delay(SI4432_step_delay * ((setting.R == 0 && old_R > 5 ) ? 8 : 1));
-      ADF4351_frequency_changed = false;
-      SI4463_frequency_changed = false;
-      SI4463_offset_changed = false;
-    } else if (SI4432_offset_delay && SI4463_offset_changed) {
-      my_microsecond_delay(SI4432_offset_delay);
-      SI4463_offset_changed = false;
-    }
+
 #define SAMPLE_COUNT 1
     int j = SAMPLE_COUNT; //setting.repeat;
     int RSSI_RAW_ARRAY[3];
@@ -2484,6 +2477,7 @@ freq_t SI4463_set_freq(freq_t freq)
                        0x10 + (uint8_t)(SI4463_band + (Npresc ? 0x08 : 0))           // 0x08 for high performance mode, 0x10 to skip recal
     };
     SI4463_do_api(data2, sizeof(data2), NULL, 0);
+    SI4463_frequency_changed = true;
 //    my_microsecond_delay(30000);
   }
 

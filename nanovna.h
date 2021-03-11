@@ -1076,7 +1076,7 @@ typedef struct properties {
 
 //sizeof(properties_t) == 0x1200
 
-#define CONFIG_MAGIC 0x434f4e4A /* 'CONF' */
+#define CONFIG_MAGIC 0x434f4e4b /* 'CONF' */
 
 extern int16_t lastsaveid;
 //extern properties_t *active_props;
@@ -1308,8 +1308,10 @@ extern uint16_t force_rbw(int f);
 extern void SI4463_do_api(void* data, uint8_t len, void* out, uint8_t outLen);
 extern void SI4463_set_gpio(int i, int s);
 extern void si_set_offset(int16_t offset);
-extern int SI4463_offset_changed;
 extern void si_fm_offset(int16_t offset);
-
+extern bool ADF4351_frequency_changed;
+extern bool SI4463_frequency_changed;
+extern bool SI4463_offset_changed;
+extern int old_R;
 #endif
 /*EOF*/
