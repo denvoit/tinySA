@@ -68,6 +68,7 @@
 #define __NICE_BIG_FONT__         // Add not scaled big font for menus
 #define __QUASI_PEAK__            // Add quasi peak average option
 #define __REMOTE_DESKTOP__        // Add remote desktop option
+#define __LISTEN__
 #ifdef TINYSA4
 #define  __HARMONIC__
 #endif
@@ -234,6 +235,8 @@ enum {
 #define MODE_LOW(x)  ((x) == M_LOW || (x) == M_GENLOW )
 
 #ifdef __SI4432__
+#define SI4432_RX                          0
+#define SI4432_LO                          1
 #define MODE_SELECT(x) (MODE_HIGH(x) ? SI4432_LO : SI4432_RX)
 #endif
 #ifdef __SI4468__
@@ -1286,6 +1289,10 @@ enum {
 enum {
   T_AUTO, T_NORMAL, T_SINGLE, T_DONE, T_UP, T_DOWN, T_MODE, T_PRE, T_POST, T_MID
 };
+
+
+extern const int SI4432_RBW_count;
+extern void SI4432_Listen(int s);
 
 #ifdef TINYSA4
 // si4432.c

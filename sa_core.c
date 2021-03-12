@@ -4502,6 +4502,7 @@ void self_test(int test)
     }
 #endif
     reset_settings(M_LOW);
+#endif
   } else if (test == 3) {                       // RBW step time search
     in_selftest = true;
     ui_mode_normal();
@@ -4556,7 +4557,7 @@ void self_test(int test)
  //       return;
  //     }
       shell_printf("Start level = %f, ",peakLevel);
-#if 1                                                                       // Enable for step delay tuning
+#if 0                                                                       // Enable for step delay tuning
       while (setting.step_delay > 10 && test_value != 0 && test_value > saved_peakLevel - 1.5) {
         test_prepare(TEST_RBW);
         setting.spur_removal = S_OFF;
@@ -4583,7 +4584,7 @@ void self_test(int test)
 #else
       setting.offset_delay = 1600;
 #endif
-#if 1                       // Enable for offset tuning stepping
+#if 0                       // Enable for offset tuning stepping
       test_value = saved_peakLevel;
       if ((uint32_t)(setting.rbw_x10 * 1000) / (sweep_points) < 8000) {           // fast mode possible
         while (setting.offset_delay > 0 && test_value != 0 && test_value > saved_peakLevel - 1.5) {
@@ -4602,15 +4603,16 @@ void self_test(int test)
         }
         setting.offset_delay = setting.offset_delay * 5 / 4;            // back one level
       }
+      shell_printf("---------------------------------------------\n\r");
 #endif
       shell_printf("End level = %f, step time = %d, fast delay = %d\n\r",peakLevel, setting.step_delay, setting.offset_delay);
-      shell_printf("---------------------------------------------\n\r");
       if (setting.test_argument != 0)
         break;
     }
     reset_settings(M_LOW);
     setting.step_delay_mode = SD_NORMAL;
     setting.step_delay = 0;
+#ifdef DOESNOTFIT
   } else if (test == 4) {
     reset_settings(M_LOW);
     set_mode(M_GENLOW);

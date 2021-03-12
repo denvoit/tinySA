@@ -28,9 +28,6 @@ extern uint32_t SI4432_offset_delay;
 
 //
 #define MAX_SI4432                         2
-
-#define SI4432_RX                          0
-#define SI4432_LO                          1
 // #define SI4432_DUMMY                       2     // never used
 
 #define SI4432_DEV_TYPE                    0x00
@@ -188,7 +185,7 @@ int16_t Si446x_RSSI(void);
 uint8_t getFRR(uint8_t reg);
 si446x_state_t getState(void);
 void setState(si446x_state_t newState);
-extern const int SI4432_RBW_count;
+
 extern si446x_info_t SI4463_info;
 pureRSSI_t getSI4463_RSSI_correction(void);
 void Si446x_getInfo(si446x_info_t* info);

@@ -325,10 +325,12 @@ typedef struct {
   int8_t   RSSI_correction_x_10;  // Correction * 10
   uint16_t RBWx10;                // RBW * 10 in kHz
 }RBW_t; // sizeof(RBW_t) = 4 bytes
-static const RBW_t RBW_choices[] = {
+static const RBW_t RBW_choices[] =
+{
 // BW register    corr  freq
 //                              {IF_BW(0,5,1),0,26},
 //                              {IF_BW(0,5,2),0,28},
+#if 0
                               {IF_BW(0,5,3),3,31},
                               {IF_BW(0,5,4),-3,32},
                               {IF_BW(0,5,5),6,37},
@@ -384,9 +386,68 @@ static const RBW_t RBW_choices[] = {
                               {IF_BW(1,0,12),-20,5188},
                               {IF_BW(1,0,13),-14,5770},
                               {IF_BW(1,0,14),-9,6207},
+#else
+                              {IF_BW(0,5,3),1,31},
+                              {IF_BW(0,5,4),-4,32},
+                              {IF_BW(0,5,5),1,37},
+                              {IF_BW(0,5,6),-3,42},
+                              {IF_BW(0,5,7),-3,45},
+                              {IF_BW(0,4,1),-4,49},
+                              {IF_BW(0,4,2),-4,54},
+                              {IF_BW(0,4,3),-3,59},
+                              {IF_BW(0,4,4),-4,61},
+                              {IF_BW(0,4,5),1,72},
+                              {IF_BW(0,4,6),1,82},
+                              {IF_BW(0,4,7),1,88},
+                              {IF_BW(0,3,1),-4,95},
+                              {IF_BW(0,3,2),-4,106},
+                              {IF_BW(0,3,3),-3,115},
+                              {IF_BW(0,3,4),-8,121},
+                              {IF_BW(0,3,5),1,142},
+                              {IF_BW(0,3,6),1,162},
+                              {IF_BW(0,3,7),1,175},
+                              {IF_BW(0,2,1),-4,189},
+                              {IF_BW(0,2,2),-4,210},
+                              {IF_BW(0,2,3),1,227},
+                              {IF_BW(0,2,4),-4,240},
+                              {IF_BW(0,2,5),1,282},
+                              {IF_BW(0,2,6),1,322},
+                              {IF_BW(0,2,7),1,347},
+                              {IF_BW(0,1,1),-4,377},
+                              {IF_BW(0,1,2),-4,417},
+                              {IF_BW(0,1,3),-3,452},
+                              {IF_BW(0,1,4),-4,479},
+                              {IF_BW(0,1,5),1,562},
+                              {IF_BW(0,1,6),1,641},
+                              {IF_BW(0,1,7),1,692},
+                              {IF_BW(0,0,1),-4,752},
+                              {IF_BW(0,0,2),-4,832},
+                              {IF_BW(0,0,3),-3,900},
+                              {IF_BW(0,0,4),-4,953},
+                              {IF_BW(0,0,5),6,1121},
+                              {IF_BW(0,0,6),1,1279},
+                              {IF_BW(0,0,7),1,1379},
+                              {IF_BW(1,1,4),16,1428},
+                              {IF_BW(1,1,5),22,1678},
+                              {IF_BW(1,1,9),-53,1811},
+                              {IF_BW(1,0,15),-104,1915},
+                              {IF_BW(1,0,1),16,2251},
+                              {IF_BW(1,0,2),21,2488},
+                              {IF_BW(1,0,3),17,2693},
+                              {IF_BW(1,0,4),11,2849},
+                              {IF_BW(1,0,8),-19,3355},
+                              {IF_BW(1,0,9),-54,3618},
+                              {IF_BW(1,0,10),-14,4202},
+                              {IF_BW(1,0,11),-14,4684},
+                              {IF_BW(1,0,12),-23,5188},
+                              {IF_BW(1,0,13),-14,5770},
+                              {IF_BW(1,0,14),-9,6207},
 
+#endif
 
 };
+
+const int SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
 
 static pureRSSI_t SI4432_RSSI_correction = float_TO_PURE_RSSI(-120);
 
@@ -617,6 +678,71 @@ void SI4432_Fill(int s, int start)
   buf_index = start; // Is used to skip 1st entry during level triggering
   buf_end = sweep_points - 1;
   buf_read = true;
+}
+#endif
+
+#ifdef __LISTEN__
+const uint8_t dBm_to_volt [] =
+{
+ 255,
+ 225,
+ 198,
+ 175,
+ 154,
+ 136,
+ 120,
+ 106,
+ 93,
+ 82,
+ 72,
+ 64,
+ 56,
+ 50,
+ 44,
+ 39,
+ 34,
+ 30,
+ 26,
+ 23,
+ 21,
+ 18,
+ 16,
+ 14,
+ 12,
+ 11,
+ 10,
+ 8,
+ 7,
+ 7,
+ 6,
+ 5,
+ 5,
+};
+
+void SI4432_Listen(int s)
+{
+  SI4432_Sel = s;
+  uint16_t sel = SI_nSEL[SI4432_Sel];
+  uint8_t max = 0;
+  uint16_t count = 0;
+  do {
+    uint8_t v;
+    palClearPad(GPIOC, sel);
+    shiftOut(SI4432_REG_RSSI);
+    v = shiftIn();
+    palSetPad(GPIOC, sel);
+    if (max < v)                // Peak
+      max = v;
+    if (count > 1000) {         // Decay
+      max -= 1;
+      count = 0;
+    } else
+      count++;
+    v = max - v;
+    dacPutChannelX(&DACD2, 0, dBm_to_volt[v] << 4);
+  } while((operation_requested & OP_LEVER) != OP_LEVER);
+  count = 0;
+  dacPutChannelX(&DACD2, 0, 0);
 }
 #endif
 

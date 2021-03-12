@@ -678,6 +678,14 @@ static UI_FUNCTION_CALLBACK(menu_dfu_cb)
   enter_dfu();
 }
 
+#ifdef __LISTEN__
+static UI_FUNCTION_CALLBACK(menu_listen_cb)
+{
+  (void)data;
+  (void)item;
+  SI4432_Listen(MODE_SELECT(setting.mode));
+}
+#endif
 
 // const int menu_modulation_value[]={MO_NONE,MO_AM, MO_NFM, MO_WFM, MO_EXTERNAL};
 const char *menu_modulation_text[]={"None", "AM", "NFM", "WFM", "External"};
@@ -2098,6 +2106,9 @@ static const menuitem_t menu_level[] = {
   { MT_ADV_CALLBACK | MT_LOW ,0,"LNA",          menu_extra_lna_acb},
  #endif
   { MT_SUBMENU,  0,             "TRIGGER",      menu_trigger},
+#ifdef __LISTEN__
+  { MT_CALLBACK, 0,             "LISTEN",       menu_listen_cb},
+#endif
   { MT_CANCEL, 0,               S_LARROW" BACK",NULL },
   { MT_NONE,   0, NULL, NULL } // sentinel
 };
