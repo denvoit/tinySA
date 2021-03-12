@@ -4551,7 +4551,7 @@ void self_test(int test)
 //        goto do_again;
 //      }
 
-      float saved_peakLevel = peakLevel;
+ //     float saved_peakLevel = peakLevel;
  //     if (peakLevel < -35) {
  //       shell_printf("Peak level too low, abort\n\r");
  //       return;

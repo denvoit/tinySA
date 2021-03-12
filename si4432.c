@@ -447,7 +447,7 @@ static const RBW_t RBW_choices[] =
 
 };
 
-const int SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
+const uint8_t SI4432_RBW_count = ARRAY_COUNT(RBW_choices);
 
 static pureRSSI_t SI4432_RSSI_correction = float_TO_PURE_RSSI(-120);
 

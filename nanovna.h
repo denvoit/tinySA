@@ -1291,7 +1291,7 @@ enum {
 };
 
 
-extern const int SI4432_RBW_count;
+extern const uint8_t SI4432_RBW_count;
 extern void SI4432_Listen(int s);
 
 #ifdef TINYSA4
