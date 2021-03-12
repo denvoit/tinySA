@@ -77,6 +77,20 @@ VNA_SHELL_FUNCTION(cmd_modulation )
   }
 }
 
+VNA_SHELL_FUNCTION(cmd_calc )
+{
+  static const char cmd_cal[] = "off|minh|maxh|maxd|aver4|aver16|quasip";
+  if (argc < 1) {
+  usage:
+    shell_printf("usage: calc %s\r\n", cmd_cal);
+    return;
+  }
+  int m = get_str_index(argv[0], cmd_cal);
+  if (m<0)
+     goto usage;
+  set_average(m);
+}
+
 int generic_option_cmd( const char *cmd, const char *cmd_list, int argc, char *argv)
 {
   if (argc != 1) {
@@ -164,6 +178,49 @@ VNA_SHELL_FUNCTION(cmd_load)
 usage:
   shell_printf("usage: load 0..4\r\n");
 }
+
+#ifdef TINYSA4
+
+static uint8_t reg_agc_lna = 0;
+
+VNA_SHELL_FUNCTION(cmd_lna2)
+{
+  int a;
+  if (argc != 1) {
+//  usage:
+    shell_printf("usage: lna2 0..7|auto\r\n");
+    return;
+  }
+  if (get_str_index(argv[0],"auto") == 0) {
+    reg_agc_lna &= 0xf0;
+  } else {
+    a = my_atoi(argv[0]);
+    reg_agc_lna &= 0xf0;
+    reg_agc_lna |= 0x08 | a;
+  }
+  SI446x_set_AGC_LNA(reg_agc_lna);
+}
+
+VNA_SHELL_FUNCTION(cmd_agc)
+{
+  int a;
+  if (argc != 1) {
+//  usage:
+    shell_printf("usage: agc 0..7|auto\r\n");
+    return;
+  }
+  if (get_str_index(argv[0],"auto") == 0) {
+    reg_agc_lna &= 0x0f;
+  } else {
+    a = my_atoi(argv[0]);
+    reg_agc_lna &= 0x0f;
+    reg_agc_lna |= 0x80 | (a << 4);
+  }
+  SI446x_set_AGC_LNA(reg_agc_lna);
+}
+
+#endif
+
 
 VNA_SHELL_FUNCTION(cmd_attenuate)
 {
@@ -813,8 +870,8 @@ VNA_SHELL_FUNCTION(cmd_scanraw)
     points = my_atoi(argv[2]);
   }
 
-//  if (get_waterfall())
-//    disable_waterfall();            // display dma hangs when waterfall is enabled
+  if (setting.waterfall)
+    disable_waterfall();            // display dma hangs when waterfall is enabled
 
   freq_t old_step = setting.frequency_step;
   float f_step = (stop-start)/ points;

@@ -993,9 +993,9 @@ config_t config = {
   .high_correction_frequency = { 240000000, 280000000, 300000000, 400000000, 500000000, 600000000, 700000000, 800000000, 900000000, 960000000 },
   .high_correction_value = { 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0 },
   .setting_frequency_10mhz = 10000000,
-  .cor_am = -8,
-  .cor_wfm = -15,
-  .cor_nfm = -15,
+  .cor_am = 0,// -10,
+  .cor_wfm = 0, //-18,
+  .cor_nfm = 0, //-18,
   .ext_zero_level = 128,
 #endif
 #ifdef TINYSA4
@@ -1012,9 +1012,9 @@ config_t config = {
   .high_correction_frequency = { 10000, 100000, 200000, 500000, 50000000, 140000000, 200000000, 300000000, 330000000, 350000000 },
   .high_correction_value = { 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0 },
   .setting_frequency_30mhz = 30000000,
-  .cor_am = -5,
-  .cor_wfm = -55,
-  .cor_nfm = -55,
+  .cor_am = 0,
+  .cor_wfm = 0,
+  .cor_nfm = 0,
   .ultra = false,
   .high_out_adf4350 = true,
   .ext_zero_level = 174,
@@ -2432,6 +2432,8 @@ static const VNAShellCommand commands[] =
     { "if", cmd_if,    0 },
 #ifdef TINYSA4
     { "if1", cmd_if1,    0 },
+    { "lna2", cmd_lna2,    0 },
+    { "agc", cmd_agc,    0 },
 #endif
     { "attenuate", cmd_attenuate,    0 },
     { "level", cmd_level,    0 },
@@ -2455,6 +2457,7 @@ static const VNAShellCommand commands[] =
     { "deviceid", cmd_deviceid,    0 },
     { "selftest", cmd_selftest,    0 },
     { "correction", cmd_correction,    0 },
+    { "calc", cmd_calc, 0},
  #ifdef ENABLE_THREADS_COMMAND
      {"threads"     , cmd_threads     , 0},
  #endif
@@ -2899,6 +2902,10 @@ int main(void)
 
 /* restore config */
   config_recall();
+  config.cor_am = 0;        // Should be removed from config
+  config.cor_nfm = 0;
+  config.cor_wfm = 0;
+
   if (caldata_recall(0) == -1) {
     load_LCD_properties();
   }
@@ -2924,7 +2931,7 @@ int main(void)
   setup_sa();
   set_sweep_points(POINTS_COUNT);
 
-#ifdef __AUDIO__
+  #ifdef __AUDIO__
 /*
  * I2S Initialize
  */
@@ -2963,6 +2970,7 @@ int main(void)
   ui_mode_normal();
 
   chThdCreateStatic(waThread1, sizeof(waThread1), NORMALPRIO-1, Thread1, NULL);
+
 
   while (1) {
     if (SDU1.config->usbp->state == USB_ACTIVE) {

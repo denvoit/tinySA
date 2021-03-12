@@ -1068,18 +1068,22 @@ void set_unit(int u)
       r = REFLEVEL_MAX;                          // Maximum value
     set_scale(r/NGRIDY);
     set_reflevel(setting.scale*NGRIDY);
+#ifdef __SI4432__
     if (S_IS_AUTO(setting.agc))
       setting.agc = S_AUTO_ON;
     if (S_IS_AUTO(setting.lna))
       setting.lna = S_AUTO_OFF;
+#endif
   } else {
     r = 10 * roundf((r*1.2)/10.0);
     set_reflevel(r);
     set_scale(10);
+#ifdef __SI4432__
     if (S_IS_AUTO(setting.agc))
       setting.agc = S_AUTO_ON;
     if (S_IS_AUTO(setting.lna))
       setting.lna = S_AUTO_OFF;
+#endif
   }
   plot_into_index(measured);
   redraw_request|=REDRAW_AREA;
@@ -1087,7 +1091,7 @@ void set_unit(int u)
 }
 
 const float unit_scale_value[]={  1, 0.001,   0.000001, 0.000000001, 0.000000000001};
-const char  unit_scale_text[]= {' ',   'm', S_MICRO[0],         'n',            'p'};
+const char  unit_scale_text[]= {' ',   'm',     '\035',         'n',            'p'};
 
 void user_set_reflevel(float level)
 {
@@ -1280,13 +1284,13 @@ static const struct {
   uint16_t spur_div_1000;
 } step_delay_table[]={
 //  RBWx10 step_delay  offset_delay spur_gate (value divided by 1000)
-  {  6000,        80,           50,      400},
-  {  3000,        80,           50,      200},
-  {  1000,       100,          100,      100},
+  {  6000,       300,           50,      400},
+  {  3000,       400,           50,      200},
+  {  1000,       400,          100,      100},
   {   300,       400,          120,      100},
-  {   100,       400,          120,      100},
+  {   100,       700,          120,      100},
   {    30,       900,          300,      100},
-  {    10,      3000,          600,      100},
+  {    10,      4000,          600,      100},
   {     0,      9000,         3000,      100}
 };
 #endif
@@ -2235,10 +2239,22 @@ void clock_below_48MHz(void)
   }
 }
 
+void clock_at_48MHz(void)
+{
+  if (hsical == -1)
+    hsical = ( (RCC->CR & 0xff00) >> 8 );
+  if (hsical != -1) {
+    RCC->CR &= RCC_CR_HSICAL;
+    RCC->CR |= ( (hsical) << 8 );
+    RCC->CR &= RCC_CR_HSITRIM | RCC_CR_HSION; /* CR Reset value.              */
+  }
+}
+
 pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     // Measure the RSSI for one frequency, used from sweep and other measurement routines. Must do all HW setup
 {
   int modulation_delay = 0;
   int modulation_index = 0;
+  int modulation_count_iter = 0;
   int spur_second_pass = false;
   if (i == 0 && dirty ) {                                                        // if first point in scan and dirty
 #ifdef __ADF4351__
@@ -2276,7 +2292,9 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
       calculate_static_correction();
       if (!in_selftest) clock_above_48MHz();
       is_below = false;
-    }
+      correct_RSSI_freq = get_frequency_correction(f);  // for i == 0 and freq_step == 0;
+    } else
+      clock_at_48MHz();
     //    if (MODE_OUTPUT(setting.mode) && setting.additional_step_delay_us < 500)     // Minimum wait time to prevent LO from lockup during output frequency sweep
     //      setting.additional_step_delay_us = 500;
     // Update grid and status after
@@ -2347,7 +2365,8 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
           a = -31.5;
         a = -a;
 #ifdef __PE4302__
-        PE4302_Write_Byte((int)(a * 2) );
+        setting.attenuate_x2 = (int)(a * 2);
+        PE4302_Write_Byte(setting.attenuate_x2);
 #endif
       }
     }
@@ -2408,7 +2427,7 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
 #endif
   // Calculate the RSSI correction for later use
   if (MODE_INPUT(setting.mode)){ // only cases where the value can change on 0 point of sweep
-    if (i == 0 || setting.frequency_step != 0)
+    if (setting.frequency_step != 0)
       correct_RSSI_freq = get_frequency_correction(f);
   }
   int *current_fm_modulation = 0;
@@ -2534,12 +2553,18 @@ modulation_again:
       if (!setting.auto_IF)
         local_IF = setting.frequency_IF;
       else
-#ifdef TINYSA4	  
-        local_IF = config.frequency_IF1;
+      {
+#ifdef TINYSA4
+        if (f < 2000000 && S_IS_AUTO(setting.spur_removal) && S_IS_AUTO(setting.below_IF))
+
+          local_IF = config.frequency_IF1 + DEFAULT_SPUR_OFFSET;
+        else
+          local_IF = config.frequency_IF1;
 #else
         local_IF = DEFAULT_IF;
 #endif
-		if (setting.mode == M_LOW) {
+    }
+     if (setting.mode == M_LOW) {
         if (tracking) {                                // VERY SPECIAL CASE!!!!!   Measure BPF
 #if 0                                                               // Isolation test
           local_IF = lf;
@@ -2662,13 +2687,13 @@ modulation_again:
 
         if (setting.R == 0) {
           if (lf < LOW_MAX_FREQ && lf >= TXCO_DIV3 && MODE_INPUT(setting.mode)) {
-            freq_t tf = ((lf + actual_rbw_x10*100) / TCXO) * TCXO;
-            if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100) {
+            freq_t tf = ((lf + actual_rbw_x10*1000) / TCXO) * TCXO;
+            if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100) {   // 30MHz
               ADF4351_R_counter(6);
             } else {
               if (setting.frequency_step < 100000) {
-                freq_t tf = ((lf + actual_rbw_x10*100) / TXCO_DIV3) * TXCO_DIV3;
-                if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100)
+                freq_t tf = ((lf + actual_rbw_x10*1000) / TXCO_DIV3) * TXCO_DIV3;
+                if (tf + actual_rbw_x10*100 >= lf  && tf < lf + actual_rbw_x10*100) // 10MHz
                   ADF4351_R_counter(4);
                 else
                   ADF4351_R_counter(3);
@@ -2825,12 +2850,16 @@ modulation_again:
          spur = '!';
      }
      char shifted = ( LO_shifted ? '>' : ' ');
-      if (SDU1.config->usbp->state == USB_ACTIVE)
-        shell_printf ("%d:%c%c%c%cLO=%11.6Lq:%11.6Lq\tIF=%11.6Lq:%11.6Lq\tOF=%11.6q\tF=%11.6Lq:%11.6Lq\tD=%.2f:%.2f\r\n",
-                      i,   spur, shifted,(LO_mirrored ? 'm' : ' '), (LO_harmonic ? 'h':' ' ),
-                      old_freq[ADF4351_LO],real_old_freq[ADF4351_LO],
-                      old_freq[SI4463_RX], real_old_freq[SI4463_RX], (int32_t)real_offset, f_low, f_high , f_error_low, f_error_high);
-      osalThreadSleepMilliseconds(100);
+     if (SDU1.config->usbp->state == USB_ACTIVE)
+       shell_printf ("%d:%c%c%c%cLO=%11.6Lq:%11.6Lq\tIF=%11.6Lq:%11.6Lq\tOF=%11.6d\tF=%11.6Lq:%11.6Lq\tD=%.2f:%.2f %c%c%c\r\n",
+                     i,   spur, shifted,(LO_mirrored ? 'm' : ' '), (LO_harmonic ? 'h':' ' ),
+                     old_freq[ADF4351_LO],real_old_freq[ADF4351_LO],
+                     old_freq[SI4463_RX], real_old_freq[SI4463_RX], (int32_t)real_offset, f_low, f_high , f_error_low, f_error_high,
+                     (ADF4351_frequency_changed? 'A' : ' '),
+                     (SI4463_frequency_changed? 'S' : ' '),
+                     (SI4463_offset_changed? 'O' : ' ')
+                                          );
+     osalThreadSleepMilliseconds(100);
     }
 #endif
     // ------------------------- end of processing when in output mode ------------------------------------------------
@@ -2844,6 +2873,11 @@ modulation_again:
         return(0);         // abort
       if ( i==1 && MODE_OUTPUT(setting.mode) && setting.modulation != MO_NONE && setting.modulation != MO_EXTERNAL) { // if in output mode with modulation and LO setup done
 //        i = 1;              // Everything set so skip LO setting
+#define MODULATION_CYCLES_TEST   10000
+        if (in_selftest && modulation_count_iter++ >= 10000) {
+          start_of_sweep_timestamp = (chVTGetSystemTimeX() - start_of_sweep_timestamp)*MODULATION_STEPS*100/MODULATION_CYCLES_TEST;  // uS per cycle
+          return 0;
+        }
         goto modulation_again;                                             // Keep repeating sweep loop till user aborts by input
       }
       return(0);
@@ -2861,7 +2895,7 @@ modulation_again:
 #endif
 #ifdef __SI4463__
     if (i == 0 && setting.frequency_step == 0 && setting.trigger == T_AUTO && S_STATE(setting.spur_removal) == 0 && SI4432_step_delay == 0 && setting.repeat == 1 && setting.sweep_time_us < 100*ONE_MS_TIME) {
-      SI446x_Fill(MODE_SELECT(setting.mode), 0);
+      SI446x_Fill(MODE_SELECT(setting.mode), -1);   // First get_RSSI will fail
     }
 #endif
 #endif
@@ -2937,6 +2971,23 @@ modulation_again:
       }
       start_of_sweep_timestamp = chVTGetSystemTimeX();
     }
+#ifdef TINYSA4
+    if (SI4432_step_delay && (ADF4351_frequency_changed || SI4463_frequency_changed)) {
+      int my_step_delay = SI4432_step_delay;
+      if (f < 2000000 && actual_rbw_x10 == 3)
+        my_step_delay = my_step_delay * 2;
+      if (SI4463_offset_changed)
+        my_step_delay = my_step_delay * 2;
+      my_microsecond_delay(my_step_delay * ((setting.R == 0 && old_R > 5 ) ? 8 : 1));
+      ADF4351_frequency_changed = false;
+      SI4463_frequency_changed = false;
+      SI4463_offset_changed = false;
+    } else if (SI4432_offset_delay && SI4463_offset_changed) {
+      my_microsecond_delay(SI4432_offset_delay);
+      SI4463_offset_changed = false;
+    }
+#endif
+
     //else
     {
 #ifdef __SI4432__
@@ -2953,6 +3004,10 @@ modulation_again:
 #endif
 #endif
     }
+//    if (pureRSSI < 400) {
+//      volatile int i = 0;
+//      i = i + 1;
+//   }
 #ifdef __SPUR__
     static pureRSSI_t spur_RSSI = -1;                               // Initialization only to avoid warning.
     if (setting.mode == M_LOW && S_STATE(setting.spur_removal)) {
@@ -3031,6 +3086,12 @@ static bool sweep(bool break_on_operation)
 
   modulation_counter = 0;                                             // init modulation counter in case needed
   int refreshing = false;
+
+  if (MODE_OUTPUT(setting.mode) && config.cor_am == 0) {                          // Calibrate the modulation frequencies at first use
+    calibrate_modulation(MO_AM, &config.cor_am);
+    calibrate_modulation(MO_NFM, &config.cor_nfm);
+    calibrate_modulation(MO_WFM, &config.cor_wfm);
+  }
 
   if (dirty) {                    // Calculate new scanning solution
     sweep_counter = 0;
@@ -3192,10 +3253,10 @@ sweep_again:                                // stay in sweep loop when output mo
 
 
       // START_PROFILE
-      if (i == 0) {                                          // Prepare peak finding
+      if (i == 0 || frequencies[i] < actual_rbw_x10 * 200) {   // Prepare peak finding
         cur_max = 0;          // Always at least one maximum
         temppeakIndex = 0;
-        temppeakLevel = actual_t[i];
+        temppeakLevel = actual_t[0];
         max_index[0] = 0;
         downslope = true;
       }
@@ -3242,9 +3303,10 @@ sweep_again:                                // stay in sweep loop when output mo
     }           // end of input specific processing
   }  // ---------------------- end of sweep loop -----------------------------
 
-  if (MODE_OUTPUT(setting.mode) && setting.modulation != MO_NONE ) // if in output mode with modulation
-    goto sweep_again;                                             // Keep repeating sweep loop till user aborts by input
-
+  if (MODE_OUTPUT(setting.mode) && setting.modulation != MO_NONE) { // if in output mode with modulation
+    if (!in_selftest)
+      goto sweep_again;                                             // Keep repeating sweep loop till user aborts by input
+  }
   // --------------- check if maximum is above trigger level -----------------
 
   if (setting.trigger != T_AUTO && setting.frequency_step > 0) {    // Trigger active
@@ -3345,7 +3407,7 @@ sweep_again:                                // stay in sweep loop when output mo
 #endif
   // -------------------------- auto attenuate ----------------------------------
 #ifdef TINYSA4
-#define AUTO_TARGET_LEVEL   -30
+#define AUTO_TARGET_LEVEL   (actual_rbw_x10  >= 10 ? -30 : -40)
 #else
 #define AUTO_TARGET_LEVEL   -25
 #endif
@@ -3534,6 +3596,21 @@ sweep_again:                                // stay in sweep loop when output mo
       markers[1].enabled = search_maximum(1, frequencies[markers[0].index]*2, 8);
       markers[2].enabled = search_maximum(2, frequencies[markers[0].index]*3, 12);
       markers[3].enabled = search_maximum(3, frequencies[markers[0].index]*4, 16);
+#ifdef TINYSA4
+    } else if (setting.measurement == M_AM  && markers[0].index > 10) { // ----------IOP measurement
+      int l = markers[1].index;
+      int r = markers[2].index;
+      if (r < l) {
+        l = markers[2].index;
+        r = markers[1].index;
+        markers[1].index = l;
+        markers[2].index = r;
+      }
+      freq_t lf = frequencies[l];
+      freq_t rf = frequencies[r];
+      markers[1].frequency = lf;
+      markers[2].frequency = rf;
+#endif
     } else if (setting.measurement == M_OIP3  && markers[0].index > 10 && markers[1].index > 10) { // ----------IOP measurement
       int l = markers[0].index;
       int r = markers[1].index;
@@ -3578,6 +3655,7 @@ sweep_again:                                // stay in sweep loop when output mo
       }
     } else if (setting.measurement == M_AM) {      // ----------------AM measurement
       if (S_IS_AUTO(setting.agc )) {
+#ifdef __SI4432__
         int actual_level = actual_t[max_index[0]] - get_attenuation();  // no need for float
         if (actual_level > -20 ) {
           setting.agc = S_AUTO_OFF;
@@ -3590,6 +3668,7 @@ sweep_again:                                // stay in sweep loop when output mo
           setting.lna = S_AUTO_ON;
         }
         set_AGC_LNA();
+#endif
       }
     }
 
@@ -4296,6 +4375,9 @@ void self_test(int test)
       else
         goto resume;
     }
+    // Disable waterfall on selftest
+    if (setting.waterfall)
+      disable_waterfall();
     reset_settings(M_LOW);                      // Make sure we are in a defined state
     in_selftest = true;
     menu_autosettings_cb(0, 0);
@@ -4529,6 +4611,37 @@ void self_test(int test)
     reset_settings(M_LOW);
     setting.step_delay_mode = SD_NORMAL;
     setting.step_delay = 0;
+  } else if (test == 4) {
+    reset_settings(M_LOW);
+    set_mode(M_GENLOW);
+    set_sweep_frequency(ST_CENTER, (freq_t)30000000);
+    set_sweep_frequency(ST_SPAN, (freq_t)0);
+    setting.modulation = MO_AM;
+    setting.modulation_frequency = 5000;
+    in_selftest = true;
+    config.cor_am = 0;
+    perform(false,0, 30000000, false);
+    perform(false,1, 30000000, false);
+    config.cor_am = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+
+    setting.modulation = MO_NFM;
+    setting.modulation_frequency = 5000;
+    in_selftest = true;
+    config.cor_nfm = 0;
+    perform(false,0, 30000000, false);
+    perform(false,1, 30000000, false);
+    config.cor_nfm = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+
+    setting.modulation = MO_WFM;
+    setting.modulation_frequency = 5000;
+    in_selftest = true;
+    config.cor_wfm = 0;
+    perform(false,0, 30000000, false);
+    perform(false,1, 30000000, false);
+    config.cor_wfm = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+
+    //    shell_printf("\n\rCycle time = %d\n\r", start_of_sweep_timestamp);
+    reset_settings(M_LOW);
   } else if (test == 5) {
 //    reset_settings(M_LOW);                      // Make sure we are in a defined state
     in_selftest = true;
@@ -4598,6 +4711,20 @@ void reset_calibration(void)
   config.low_level_offset = 100;
 }
 
+void calibrate_modulation(int modulation, int8_t *correction)
+{
+  if (*correction == 0) {
+    setting.modulation = modulation;
+    setting.modulation_frequency = 5000;
+    in_selftest = true;
+    perform(false,0, 30000000, false);
+    perform(false,1, 30000000, false);
+    in_selftest = false;
+    *correction = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+    setting.modulation = M_OFF;
+  }
+}
+
 #define CALIBRATE_RBWS  1
 const int power_rbw [5] = { 100, 300, 30, 10, 3 };
 
@@ -4616,7 +4743,7 @@ void calibrate(void)
       test_prepare(TEST_POWER);
       setting.step_delay_mode = SD_PRECISE;
 #ifndef TINYSA4
-      setting.agc = S_OFF;
+      setting.agc = S_ON;
       setting.lna = S_OFF;
 #endif
       test_acquire(TEST_POWER);                        // Acquire test

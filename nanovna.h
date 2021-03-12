@@ -1076,7 +1076,7 @@ typedef struct properties {
 
 //sizeof(properties_t) == 0x1200
 
-#define CONFIG_MAGIC 0x434f4e4A /* 'CONF' */
+#define CONFIG_MAGIC 0x434f4e4b /* 'CONF' */
 
 extern int16_t lastsaveid;
 //extern properties_t *active_props;
@@ -1277,6 +1277,7 @@ float to_dBm(float);
 uint32_t calc_min_sweep_time_us(void);
 pureRSSI_t perform(bool b, int i, freq_t f, int e);
 void interpolate_maximum(int m);
+void calibrate_modulation(int modulation, int8_t *correction);
 
 enum {
   M_OFF, M_IMD, M_OIP3, M_PHASE_NOISE, M_STOP_BAND, M_PASS_BAND, M_LINEARITY, M_AM, M_FM, M_THD
@@ -1308,8 +1309,10 @@ extern uint16_t force_rbw(int f);
 extern void SI4463_do_api(void* data, uint8_t len, void* out, uint8_t outLen);
 extern void SI4463_set_gpio(int i, int s);
 extern void si_set_offset(int16_t offset);
-extern int SI4463_offset_changed;
 extern void si_fm_offset(int16_t offset);
-
+extern bool ADF4351_frequency_changed;
+extern bool SI4463_frequency_changed;
+extern bool SI4463_offset_changed;
+extern int old_R;
 #endif
 /*EOF*/

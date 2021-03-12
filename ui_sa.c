@@ -872,6 +872,7 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
   switch(data) {
     case M_OFF:                                     // Off
 //      reset_settings(setting.mode);
+   no_measurement:
       set_measurement(M_OFF);
       break;
     case M_IMD:                                     // IMD
@@ -965,10 +966,18 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       reset_settings(setting.mode);
       for (int i = 0; i< 3; i++) {
         markers[i].enabled = M_ENABLED;
+#ifdef TINYSA4
+        markers[i].mtype = M_DELTA| M_TRACKING;
+#else
         markers[i].mtype = M_DELTA;// | M_TRACKING;
+#endif
       }
       freq_t center, span;
+#ifdef TINYSA4
+      markers[0].mtype = M_REFERENCE | M_TRACKING;
+#else
       markers[0].mtype = M_REFERENCE;// | M_TRACKING;
+#endif
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
       center = uistat.value;
@@ -977,12 +986,17 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
 //      if (uistat.value < 3000)
 //        break;
       span = uistat.value;
-      set_sweep_frequency(ST_SPAN, span * 10);
+#ifdef TINYSA4
+      set_RBW((span * 5 / 50) / 100);
+#endif
+      set_sweep_frequency(ST_SPAN, span * 5);
 //      update_frequencies();                     // To ensure markers are positioned right!!!!!!
       set_measurement(M_AM);
+#ifndef TINYSA4
       set_marker_frequency(0, center);
       set_marker_frequency(1, center-span);
       set_marker_frequency(2, center+span);
+#endif
       set_average(4);
       break;
     case M_FM:                                     // FM
@@ -995,11 +1009,19 @@ static UI_FUNCTION_ADV_CALLBACK(menu_measure_acb)
       kp_help_text = "Frequency of signal";
       ui_mode_keypad(KM_CENTER);
       set_marker_frequency(0, uistat.value);
+#ifdef TINYSA4
+      kp_help_text = "Modulation frequency: 1 .. 10kHz";
+      ui_mode_keypad(KM_SPAN);
+      if (uistat.value < 1000 || uistat.value > 10000)
+        goto no_measurement;
+      set_RBW(uistat.value/300);
+#else
       kp_help_text = "Modulation frequency: 1 .. 2.5kHz";
       ui_mode_keypad(KM_SPAN);
       if (uistat.value < 1000 || uistat.value > 2500)
-        break;
+        goto no_measurement;
       set_RBW(uistat.value/100);
+#endif
       // actual_rbw_x10
       kp_help_text = "Frequency deviation: 3 .. 500kHz";
       ui_mode_keypad(KM_SPAN);
