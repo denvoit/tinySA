@@ -304,21 +304,29 @@ VNA_SHELL_FUNCTION(cmd_leveloffset)
     return;
   }
   int mode = get_str_index(argv[0], cmd_mode_list);
+  if (mode < 0) goto usage;
   float v;
-  if (argc == 2)
+  if (argc == 2){
     v = my_atof(argv[1]);
-  else if (argc == 3 && get_str_index(argv[1], "output") == 0)
-    v = my_atof(argv[2]);
-  else
-    goto usage;
-  switch (mode){
-    case 0: config.low_level_offset = v; break;
-    case 1: config.high_level_offset = v; break;
-    case 2: config.switch_offset = v; break;
-    default: goto usage;
+    switch (mode){
+      case 0: config.low_level_offset = v; break;
+      case 1: config.high_level_offset = v; break;
+      case 2: config.switch_offset = v; break;
+      default: goto usage;
+    }
+    dirty = true;
+    return;
   }
-  dirty = true;
-  return;
+  if (argc == 3 && get_str_index(argv[1], "output") == 0){
+    v = my_atof(argv[2]);
+    switch (mode){
+      case 0: config.low_level_output_offset = v; break;
+      case 1: config.high_level_output_offset = v; break;
+      default: goto usage;
+    }
+    dirty = true;
+    return;
+  }
 usage:
   shell_printf("leveloffset [%s] {output} [-20..+20]\r\n", cmd_mode_list);
 }
