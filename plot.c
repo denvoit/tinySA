@@ -1367,7 +1367,7 @@ static void cell_grid_line_info(int x0, int y0)
   float scale = get_trace_scale();
   for (int i = 0; i < NGRIDY; i++){
     if (ypos >= CELLHEIGHT) break;
-    cell_printf(xpos, ypos, "s% 7.3F", ref);
+    cell_printf(xpos, ypos, FONT_s"% 7.3F", ref);
     ypos+=GRIDY;
     ref-=scale;
   }
@@ -1395,9 +1395,9 @@ static void cell_draw_marker_info(int x0, int y0)
     for (int c=0; c<3;c++) {
       int xpos = 10 + (c)*(WIDTH/3) + CELLOFFSETX - x0;
       int ypos = 1 - y0;
-      cell_printf(xpos, ypos, "b%4.1fdBm", channel_power[c]);
+      cell_printf(xpos, ypos, FONT_b"%4.1fdBm", channel_power[c]);
       ypos = 14 - y0;
-      cell_printf(xpos, ypos, "b%4.1f%%", 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]) );
+      cell_printf(xpos, ypos, FONT_b"%4.1f%%", 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]) );
     }
     return;
   }
@@ -1481,13 +1481,13 @@ static void cell_draw_marker_info(int x0, int y0)
       j = 2;
       int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
       int ypos = 1 + (j/2)*(16) - y0;
-      cell_printf(xpos, ypos, "sOIP3: %4.1fdB", ip);
+      cell_printf(xpos, ypos, FONT_s"OIP3: %4.1fdB", ip);
 
       ip = sr+ (sl - ir)/2;
       j = 3;
       xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
       ypos = 1 + (j/2)*(16) - y0;
-      cell_printf(xpos, ypos, "sOIP3: %4.1fdB", ip);
+      cell_printf(xpos, ypos, FONT_s"OIP3: %4.1fdB", ip);
       break;
     }
 #if 0
@@ -1496,7 +1496,7 @@ static void cell_draw_marker_info(int x0, int y0)
       int xpos = 1 + CELLOFFSETX +25 - x0;
       int ypos = 1 + 16 - y0;
 
-      cell_printf(xpos, ypos, "bDO NOT SWITCH OFF!!");
+      cell_printf(xpos, ypos, FONT_b"DO NOT SWITCH OFF!!");
       break;
     }
 #endif
@@ -1508,7 +1508,7 @@ static void cell_draw_marker_info(int x0, int y0)
       if (!trace[t].enabled)
         continue;
       int k = 0;
-      buf[k++] = (active > 1) ? 's' : 'b';
+      buf[k++] = (active > 1) ? FONT_s[0] : FONT_b[0];
       if (i == active_marker) {
 //        ili9341_set_foreground(LCD_BG_COLOR);
 //        ili9341_set_background(marker_color(markers[i].mtype));

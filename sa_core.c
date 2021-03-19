@@ -4082,14 +4082,14 @@ void cell_draw_test_info(int x0, int y0)
     int ypos = 50+i*INFO_SPACING - y0;
     unsigned int color = LCD_FG_COLOR;
     if (i == -1) {
-        plot_printf(self_test_status_buf, sizeof self_test_status_buf, "sSelf test status:");
+        plot_printf(self_test_status_buf, sizeof self_test_status_buf, FONT_s"Self test status:");
     } else if (test_case[i].kind == TC_END) {
         if (test_wait)
-          plot_printf(self_test_status_buf, sizeof self_test_status_buf, "sTouch screen to continue");
+          plot_printf(self_test_status_buf, sizeof self_test_status_buf, FONT_s"Touch screen to continue");
         else
           self_test_status_buf[0] = 0;
       } else {
-      plot_printf(self_test_status_buf, sizeof self_test_status_buf, "sTest %d: %s%s", i+1, test_fail_cause[i], test_text[test_status[i]] );
+      plot_printf(self_test_status_buf, sizeof self_test_status_buf, FONT_s"Test %d: %s%s", i+1, test_fail_cause[i], test_text[test_status[i]] );
       if (test_status[i] == TS_PASS)
         color = LCD_BRIGHT_COLOR_GREEN;
       else if (test_status[i] == TS_CRITICAL)
