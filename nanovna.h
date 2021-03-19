@@ -70,7 +70,9 @@
 #define __REMOTE_DESKTOP__        // Add remote desktop option
 #define __LISTEN__
 #ifdef TINYSA4
+#define __LIMITS__
 #define  __HARMONIC__
+#else
 #endif
 
 #ifdef TINYSA3
@@ -249,8 +251,10 @@ enum {
 #define SWEEP_CALIBRATE 0x04
 #define SWEEP_SELFTEST  0x08
 #define SWEEP_REMOTE    0x10
+#ifdef __LISTEN__
+#define SWEEP_LISTEN    0x20
 //#define SWEEP_FACTORY    0x20
-
+#endif
 
 extern uint8_t sweep_mode;
 extern bool completed;
@@ -291,6 +295,7 @@ void set_attenuation(float);
 float get_attenuation(void);
 float get_level(void);
 void set_harmonic(int);
+void set_storage(void);
 //extern int setting.harmonic;
 int search_is_greater(void);
 void set_auto_attenuation(void);
@@ -673,6 +678,18 @@ typedef struct {
   freq_t frequency;
 } marker_t;
 
+#ifdef __LIMITS__
+#define LIMITS_MAX  6
+typedef struct {
+  uint8_t enabled;
+  float level;
+  freq_t frequency;
+  int16_t index;
+} limit_t;
+extern uint8_t active_limit;
+extern void limits_update(void);
+#endif
+
 #define MARKERS_MAX 4
 #define MARKER_INVALID -1
 
@@ -952,7 +969,9 @@ typedef struct setting
   float trace_refpos;
   trace_t _trace[TRACES_MAX];
   marker_t _markers[MARKERS_MAX];
-
+#ifdef __LIMITS__
+  limit_t limits[LIMITS_MAX];
+#endif
   systime_t sweep_time_us;
   systime_t measure_sweep_time_us;
   systime_t actual_sweep_time_us;
@@ -1136,6 +1155,7 @@ void menu_move_top(void);
 void draw_menu(void);
 int check_touched(void);
 int invoke_quick_menu(int);
+bool ui_process_listen_lever(void);
 
 // Irq operation process set
 #define OP_NONE       0x00

@@ -725,24 +725,25 @@ void SI4432_Listen(int s)
   uint16_t sel = SI_nSEL[SI4432_Sel];
   uint8_t max = 0;
   uint16_t count = 0;
+  operation_requested = OP_NONE;
   do {
-    uint8_t v;
-    palClearPad(GPIOC, sel);
-    shiftOut(SI4432_REG_RSSI);
-    v = shiftIn();
-    palSetPad(GPIOC, sel);
-    if (max < v)                // Peak
-      max = v;
-    if (count > 1000) {         // Decay
-      max -= 1;
-      count = 0;
-    } else
-      count++;
-    v = max - v;
-    dacPutChannelX(&DACD2, 0, dBm_to_volt[v] << 4);
-  } while((operation_requested & OP_LEVER) != OP_LEVER);
+      uint8_t v;
+      palClearPad(GPIOC, sel);
+      shiftOut(SI4432_REG_RSSI);
+      v = shiftIn();
+      palSetPad(GPIOC, sel);
+      if (max < v)                // Peak
+        max = v;
+      if (count > 1000) {         // Decay
+        max -= 1;
+        count = 0;
+      } else
+        count++;
+      v = max - v;
+      dacPutChannelX(&DACD1, 0, dBm_to_volt[v] << 4);
+    } while(operation_requested == OP_NONE);
   count = 0;
-  dacPutChannelX(&DACD2, 0, 0);
+//   dacPutChannelX(&DACD1, 0, 0);
 }
 #endif
 

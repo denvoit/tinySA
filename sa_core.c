@@ -772,6 +772,33 @@ void set_attenuation(float a)       // Is used both only in  high/low input mode
   dirty = true;
 }
 
+#ifdef __LIMITS__
+void limits_update(void)
+{
+  int j = 0;
+  bool active = false;
+  for (int i = 0; i<LIMITS_MAX; i++)
+  {
+    if (setting.limits[i].enabled) {
+      active = true;
+      while (j < sweep_points && (frequencies[j] < setting.limits[i].frequency || setting.limits[i].frequency == 0))
+        stored_t[j++] = setting.limits[i].level;
+    }
+  }
+  if (active)
+  {
+    float old_level = stored_t[j-1];
+    while (j < sweep_points)
+      stored_t[j++] = old_level;
+    setting.show_stored = true;
+    trace[TRACE_STORED].enabled = true;
+  } else {
+    setting.show_stored = false;
+    trace[TRACE_STORED].enabled = false;
+  }
+}
+#endif
+
 void set_storage(void)
 {
   for (int i=0; i<POINTS_COUNT;i++)
@@ -2159,14 +2186,16 @@ static const int am_modulation[MODULATION_STEPS] =  { 5, 1, 0, 1, 5, 9, 11, 9 };
 #define HWD  256
 #endif
 
+#define S1  1.5
 static const int fm_modulation[4][MODULATION_STEPS] =  // Avoid sign changes in NFM
 {
- { 2*LND,(int)( 3.5*LND ), 4*LND, (int)(3.5*LND), 2*LND, (int)(0.5*LND), 0, (int)(0.5*LND)},                // Low range, NFM
- { 0*LWD,(int)( 1.5*LWD ), 2*LWD, (int)(1.5*LWD), 0*LWD, (int)(-1.5*LWD), (int)-2*LWD, (int)(-1.5*LWD)},    // Low range, WFM
+ { 2*LND,(int)( (2+S1)*LND ), 4*LND, (int)((2+S1)*LND), 2*LND, (int)((2-S1)*LND), 0, (int)((2-S1)*LND)},                // Low range, NFM
+ { 0*LWD,(int)( S1*LWD ), 2*LWD, (int)(S1*LWD), 0*LWD, (int)(-S1*LWD), (int)-2*LWD, (int)(-S1*LWD)},    // Low range, WFM
  { 2*HND,(int)( 3.5*HND ), 4*HND, (int)(3.5*HND), 2*HND, (int)(0.5*HND), 0, (int)(0.5*HND)},                // High range, NFM
  { 0*HWD,(int)( 1.5*HWD ), 2*HWD, (int)(1.5*HWD), 0*HWD, (int)(-1.5*HWD), (int)-2*HWD, (int)(-1.5*HWD)},    // HIgh range, WFM
 };    // narrow FM modulation avoid sign changes
 
+#undef S1
 static const int fm_modulation_offset[4] =
 {
 #ifdef TINYSA4
@@ -2433,7 +2462,12 @@ pureRSSI_t perform(bool break_on_operation, int i, freq_t f, int tracking)     /
   int *current_fm_modulation = 0;
   if (MODE_OUTPUT(setting.mode)) {
     if (setting.modulation != MO_NONE && setting.modulation != MO_EXTERNAL && setting.modulation_frequency != 0) {
-      modulation_delay = (1000000/ MODULATION_STEPS ) / setting.modulation_frequency;     // 5 steps so 1MHz/5
+#ifdef TINYSA3
+#define MO_FREQ_COR 65000
+#else
+#define MO_FREQ_COR 0
+#endif
+      modulation_delay = ((1000000-MO_FREQ_COR)/ MODULATION_STEPS ) / setting.modulation_frequency;     // 5 steps so 1MHz/5
       modulation_counter = 0;
       if (setting.modulation == MO_AM)          // -14 default
         modulation_delay += config.cor_am;
@@ -2768,8 +2802,8 @@ modulation_again:
 #endif
     }
 
-#if 1               // No 72MHz spur avoidance yet
-        if (setting.mode == M_LOW && !in_selftest /* && !(SDU1.config->usbp->state == USB_ACTIVE) */ ) {         // Avoid 72MHz spur
+#if 1
+        if (setting.mode == M_LOW && !in_selftest) {         // Avoid 48MHz spur
           int set_below = false;
 #ifdef TINYSA4
           if (lf < 40000000) {
@@ -2781,7 +2815,7 @@ modulation_again:
 #endif
           if (lf > 40000000){
             uint32_t tf = lf;
-            while (tf > 48000000) tf -= 48000000;
+            while (tf > 48000000) tf -= 48000000;       // Wrap between 0-48MHz
             if (tf < 20000000 )
               set_below = true;
           }
@@ -3882,7 +3916,7 @@ marker_search_right_min(int from)
 // -------------------- Self testing -------------------------------------------------
 
 enum {
-  TC_SIGNAL, TC_BELOW, TC_ABOVE, TC_FLAT, TC_MEASURE, TC_SET, TC_END, TC_ATTEN, TC_DISPLAY,
+  TC_SIGNAL, TC_BELOW, TC_ABOVE, TC_FLAT, TC_MEASURE, TC_SET, TC_END, TC_ATTEN, TC_DISPLAY, TC_LEVEL,
 };
 
 enum {
@@ -3893,11 +3927,11 @@ enum {
 
 #define W2P(w) (sweep_points * w / 100)     // convert width in % to actual sweep points
 
-#ifdef TINYSA4
-#define CAL_LEVEL   -30
-#else
+//#ifdef TINYSA4
+//#define CAL_LEVEL   -30
+//#else
 #define CAL_LEVEL   -25
-#endif
+//#endif
 
 // TODO made more compact this structure (need use aligned data)
 typedef struct test_case {
@@ -3977,6 +4011,8 @@ const test_case_t test_case [] =
  TEST_CASE_STRUCT(TC_ATTEN,      TP_30MHZ,       30,     0,      -25,    145,     -60),      // 20 Measure atten step accuracy
 #define TEST_SPUR    22
  TEST_CASE_STRUCT(TC_BELOW,      TP_SILENT,     96,     8,      -95,    0,     0),       // 22 Measure 48MHz spur
+#define TEST_LEVEL  23
+ TEST_CASE_STRUCT(TC_LEVEL,   TP_30MHZ,       30,     0,      -25,   145,     -55),      // 23 Measure level
 };
 #endif
 
@@ -4112,6 +4148,29 @@ int validate_flatness(int i) {
   return(TS_PASS);
 }
 
+int validate_level(int i, float a) {
+  int status = TS_PASS;
+  test_fail_cause[i] = "Level ";
+  float summed_peak_level = 0;
+  set_attenuation(a);
+#define LEVEL_TEST_SWEEPS    5
+  for (int k=0; k<LEVEL_TEST_SWEEPS; k++) {
+    test_acquire(TEST_ATTEN);                        // Acquire test
+    float peaklevel = 0.0;
+    for (int n = 0 ; n < sweep_points; n++)
+      peaklevel += actual_t[n];
+    peaklevel /= (sweep_points - 0);
+    summed_peak_level += peaklevel;
+  }
+  peakLevel = summed_peak_level / LEVEL_TEST_SWEEPS;
+#define LEVEL_TEST_CRITERIA 3
+  if (peakLevel - test_case[i].pass <= -LEVEL_TEST_CRITERIA || peakLevel - test_case[i].pass >= LEVEL_TEST_CRITERIA) {
+    status = TS_FAIL;
+  } else
+    test_fail_cause[i] = "";
+  return(status);
+}
+
 
 const float atten_step[7] = { 0.0, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0 };
 
@@ -4220,6 +4279,9 @@ int test_validate(int i)
     break;
   case TC_ATTEN:
     current_test_status = validate_atten(i);
+    break;
+  case TC_LEVEL:
+    current_test_status = validate_level(i, 0.0);
     break;
   case TC_DISPLAY:
     current_test_status = validate_display(i);
@@ -4550,14 +4612,13 @@ void self_test(int test)
 //        setting.step_delay = setting.step_delay * 4 / 5;
 //        goto do_again;
 //      }
-
- //     float saved_peakLevel = peakLevel;
  //     if (peakLevel < -35) {
  //       shell_printf("Peak level too low, abort\n\r");
  //       return;
  //     }
       shell_printf("Start level = %f, ",peakLevel);
 #if 0                                                                       // Enable for step delay tuning
+      float saved_peakLevel = peakLevel;
       while (setting.step_delay > 10 && test_value != 0 && test_value > saved_peakLevel - 1.5) {
         test_prepare(TEST_RBW);
         setting.spur_removal = S_OFF;
@@ -4722,7 +4783,7 @@ void calibrate_modulation(int modulation, int8_t *correction)
     perform(false,0, 30000000, false);
     perform(false,1, 30000000, false);
     in_selftest = false;
-    *correction = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency))/8;
+    *correction = -(start_of_sweep_timestamp - (ONE_SECOND_TIME / setting.modulation_frequency ))/8;
     setting.modulation = M_OFF;
   }
 }
@@ -4742,14 +4803,23 @@ void calibrate(void)
     for (int j= 0; j < CALIBRATE_RBWS; j++ ) {
       //    set_RBW(power_rbw[j]);
       //    set_sweep_points(21);
+#if 1
       test_prepare(TEST_POWER);
       setting.step_delay_mode = SD_PRECISE;
 #ifndef TINYSA4
       setting.agc = S_ON;
       setting.lna = S_OFF;
+//      set_RBW(6000);
+#else
+      set_RBW(1000);
 #endif
       test_acquire(TEST_POWER);                        // Acquire test
       local_test_status = test_validate(TEST_POWER);                       // Validate test
+#else
+      test_prepare(TEST_LEVEL);
+      test_acquire(TEST_LEVEL);                        // Acquire test
+      local_test_status = test_validate(TEST_LEVEL);                       // Validate test
+#endif
       if (k ==0 || k == 1) {
         if (peakLevel < -50) {
           ili9341_set_foreground(LCD_BRIGHT_COLOR_RED);
@@ -4763,11 +4833,11 @@ void calibrate(void)
           ili9341_drawstring_7x13("Calibration failed", 30, 140);
           goto quit;
         } else {
-#ifdef TINYSA4
-          set_actual_power(-30.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
-#else
-          set_actual_power(-25.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
-#endif
+//#ifdef TINYSA4
+//          set_actual_power(-30.0);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
+//#else
+          set_actual_power(CAL_LEVEL);           // Should be -23.5dBm (V0.2) OR 25 (V0.3)
+//#endif
           chThdSleepMilliseconds(1000);
         }
       }

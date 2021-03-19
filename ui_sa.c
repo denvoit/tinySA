@@ -426,6 +426,9 @@ enum {
 #ifdef TINYSA4
   KM_LPF,
 #endif
+#ifdef __LIMITS__
+  KM_LIMIT_FREQ, KM_LIMIT_LEVEL,
+#endif
   // #35
   KM_NONE // always at enum end
 };
@@ -473,6 +476,10 @@ static const struct {
 #ifdef TINYSA4
   {keypads_freq        , "ULTRA\nSTART"}, // KM_LPF
 #endif
+#ifdef __LIMITS__
+  {keypads_freq         , "END\nFREQ"},  // KM_LIMIT_FREQ
+  {keypads_plusmin_unit , "LEVEL"},  // KM_LIMIT_LEVEL
+#endif
 };
 #if 0 // Not used
 
@@ -495,6 +502,7 @@ static const menuitem_t  menu_modulation[];
 static const menuitem_t  menu_top[];
 static const menuitem_t  menu_reffer[];
 static const menuitem_t  menu_modulation[];
+static const menuitem_t  menu_limit_modify[];
 //static const menuitem_t  menu_drive_wide[];
 #ifdef TINYSA4
 static const menuitem_t  menu_settings3[];
@@ -679,11 +687,31 @@ static UI_FUNCTION_CALLBACK(menu_dfu_cb)
 }
 
 #ifdef __LISTEN__
-static UI_FUNCTION_CALLBACK(menu_listen_cb)
+static UI_FUNCTION_ADV_CALLBACK(menu_listen_acb)
 {
   (void)data;
   (void)item;
-  SI4432_Listen(MODE_SELECT(setting.mode));
+  if (b){
+    b->icon = (sweep_mode & SWEEP_LISTEN) ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    return;
+  }
+  if (sweep_mode & SWEEP_LISTEN) {
+    sweep_mode = SWEEP_ENABLE;
+  } else {
+    sweep_mode = SWEEP_LISTEN;
+  }
+  ui_mode_normal();
+  redraw_frame();
+  request_to_redraw_grid();
+
+#if 0
+  if (markers[active_marker].enabled == M_ENABLED) {
+    do {
+      perform(false,0,frequencies[markers[active_marker].index], false);
+      SI4432_Listen(MODE_SELECT(setting.mode));
+    } while (ui_process_listen_lever());
+  }
+#endif
 }
 #endif
 
@@ -1162,6 +1190,24 @@ static UI_FUNCTION_ADV_CALLBACK(menu_marker_select_acb)
   redraw_marker(active_marker);
 }
 
+#ifdef __LIMITS__
+uint8_t active_limit = 0;
+static UI_FUNCTION_ADV_CALLBACK(menu_limit_select_acb)
+{
+  (void)item;
+  if(b){
+    b->icon = setting.limits[data-1].enabled ? BUTTON_ICON_CHECK : BUTTON_ICON_NOCHECK;
+    b->param_1.i = data;
+    return;
+  }
+  active_limit = data -1;
+  setting.limits[active_limit].enabled = true;
+  limits_update();
+  menu_push_submenu(menu_limit_modify);
+}
+
+#endif
+
 static UI_FUNCTION_ADV_CALLBACK(menu_marker_modify_acb)
 {
   (void)item;
@@ -1211,6 +1257,19 @@ static UI_FUNCTION_CALLBACK(menu_marker_delete_cb)
     menu_move_back(false);
   }
 }
+
+#ifdef __LIMITS__
+static UI_FUNCTION_CALLBACK(menu_limit_disable_cb)
+{
+  (void)item;
+  (void)data;
+  if (active_limit<LIMITS_MAX){
+    setting.limits[active_limit].enabled = false;
+    limits_update();
+    menu_move_back(false);
+  }
+}
+#endif
 
 #ifdef TINYSA4
 static const uint16_t rbwsel_x10[]={0,3,10,30,100,300,1000,3000,6000};
@@ -1755,6 +1814,28 @@ const menuitem_t menu_marker_modify[] = {
   { MT_NONE,     0, NULL, NULL } // sentinel
 };
 
+#ifdef __LIMITS__
+static const menuitem_t menu_limit_modify[] =
+{
+  { MT_KEYPAD,   KM_LIMIT_FREQ,   "END\nFREQUENCY",    "End frequency"},
+  { MT_KEYPAD,   KM_LIMIT_LEVEL,  "LEVEL",             "Limit level"},
+  { MT_CALLBACK, 0,               "DISABLE",           menu_limit_disable_cb},
+  { MT_CANCEL,   0,          S_LARROW" BACK", NULL },
+  { MT_NONE,     0, NULL, NULL } // sentinel
+};
+
+const menuitem_t menu_limit_select[] = {
+  { MT_ADV_CALLBACK, 1, "LIMIT %d", menu_limit_select_acb },
+  { MT_ADV_CALLBACK, 2, "LIMIT %d", menu_limit_select_acb },
+  { MT_ADV_CALLBACK, 3, "LIMIT %d", menu_limit_select_acb },
+  { MT_ADV_CALLBACK, 4, "LIMIT %d", menu_limit_select_acb },
+  { MT_ADV_CALLBACK, 5, "LIMIT %d", menu_limit_select_acb },
+  { MT_ADV_CALLBACK, 6, "LIMIT %d", menu_limit_select_acb },
+  { MT_CANCEL, 0, S_LARROW" BACK", NULL },
+  { MT_NONE, 0, NULL, NULL } // sentinel
+};
+#endif
+
 #if 0
 const menuitem_t menu_marker_sel[] = {
   { MT_CALLBACK, 1, "MARKER %d", menu_marker_sel_cb },
@@ -1778,7 +1859,6 @@ const menuitem_t menu_marker_select[] = {
   { MT_CANCEL, 0, S_LARROW" BACK", NULL },
   { MT_NONE, 0, NULL, NULL } // sentinel
 };
-
 
 const menuitem_t menu_marker_ops[] = {
   { MT_CALLBACK, ST_START,  S_RARROW" START",    menu_marker_op_cb },
@@ -2056,7 +2136,9 @@ static const menuitem_t menu_display[] = {
 //  { MT_ADV_CALLBACK,0,          "STORE\nTRACE",    menu_storage_acb},
 //  { MT_ADV_CALLBACK,1,          "CLEAR\nSTORED",   menu_storage_acb},
 //  { MT_ADV_CALLBACK,2,          "SUBTRACT\nSTORED",menu_storage_acb},
-  { MT_ADV_CALLBACK,3,          "NORMALIZE",       menu_storage_acb},
+#ifdef __LIMITS__
+  { MT_SUBMENU,     0,          "LIMITS",          menu_limit_select},
+#endif
   { MT_ADV_CALLBACK,4,          "WATER\nFALL",     menu_waterfall_acb},
   { MT_SUBMENU, 0,              "SWEEP\nSETTINGS", menu_sweep_speed},
 #ifdef __REMOTE_DESKTOP__
@@ -2107,7 +2189,7 @@ static const menuitem_t menu_level[] = {
  #endif
   { MT_SUBMENU,  0,             "TRIGGER",      menu_trigger},
 #ifdef __LISTEN__
-  { MT_CALLBACK, 0,             "LISTEN",       menu_listen_cb},
+  { MT_ADV_CALLBACK, 0,             "LISTEN",       menu_listen_acb},
 #endif
   { MT_CANCEL, 0,               S_LARROW" BACK",NULL },
   { MT_NONE,   0, NULL, NULL } // sentinel
@@ -2296,6 +2378,16 @@ static void fetch_numeric_target(void)
     plot_printf(uistat.text, sizeof uistat.text, "%3.6fMHz", uistat.value / 1000000.0);
     break;
 #endif
+#ifdef __LIMITS__
+  case KM_LIMIT_FREQ:
+    uistat.value = setting.limits[active_limit].frequency;
+    plot_printf(uistat.text, sizeof uistat.text, "%3.6fMHz", uistat.value / 1000000.0);
+    break;
+  case KM_LIMIT_LEVEL:
+    uistat.value = setting.limits[active_limit].level;
+    plot_printf(uistat.text, sizeof uistat.text, "%.1f", uistat.value);
+    break;
+#endif
   case KM_NOISE:
     uistat.value = setting.noise;
     plot_printf(uistat.text, sizeof uistat.text, "%3d", ((int32_t)uistat.value));
@@ -2441,6 +2533,16 @@ set_numeric_value(void)
   case KM_LPF:
     config.ultra_threshold = uistat.value;
     config_save();
+    break;
+#endif
+#ifdef __LIMITS__
+  case KM_LIMIT_FREQ:
+    setting.limits[active_limit].frequency = uistat.value;
+    limits_update();
+    break;
+  case KM_LIMIT_LEVEL:
+    setting.limits[active_limit].level = uistat.value;
+    limits_update();
     break;
 #endif
   case KM_NOISE:

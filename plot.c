@@ -360,8 +360,8 @@ trace_into_index_y_array(index_y_t *y, float *array, int points)
   float ref_shift = 0;
   switch (setting.unit){
     case U_DBM: break;
-    case U_DBMV: ref_shift = 30.0 - 20.0*log10f(sqrtf(50.0));break;
-    case U_DBUV: ref_shift = 90.0 - 20.0*log10f(sqrtf(50.0));break;
+    case U_DBMV: ref_shift = 30.0 + 20.0*log10f(sqrtf(50.0));break;
+    case U_DBUV: ref_shift = 90.0 + 20.0*log10f(sqrtf(50.0));break;
     case U_VOLT: vmult = powf(10, -30.0/20.0) * sqrtf(50.0); mult = logf(10.0)/20.0;break;
     case U_WATT: vmult = 1.0/1000.0;                         mult = logf(10.0)/10.0;break;
     default:

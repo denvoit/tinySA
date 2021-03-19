@@ -1914,6 +1914,75 @@ again:
 }
 #endif
 
+#ifdef __LISTEN__
+const uint8_t dBm_to_volt [] =
+{
+ 255,
+ 225,
+ 198,
+ 175,
+ 154,
+ 136,
+ 120,
+ 106,
+ 93,
+ 82,
+ 72,
+ 64,
+ 56,
+ 50,
+ 44,
+ 39,
+ 34,
+ 30,
+ 26,
+ 23,
+ 21,
+ 18,
+ 16,
+ 14,
+ 12,
+ 11,
+ 10,
+ 8,
+ 7,
+ 7,
+ 6,
+ 5,
+ 5,
+};
+
+void SI4432_Listen(int s)
+{
+  (void) s;
+  uint8_t max = 0;
+  uint16_t count = 0;
+  operation_requested = OP_NONE;
+  do {
+      uint8_t v;
+      uint8_t data[3] = {
+                         SI446X_CMD_GET_MODEM_STATUS,
+                         0xFF
+      };
+      uint8_t out[3];
+      __disable_irq();
+      SI4463_do_api(data, 2, out, 3);          // TODO no clear of interrupts
+      __enable_irq();
+      v = out[2];
+      if (max < v)                // Peak
+        max = v;
+      if (count > 1000) {         // Decay
+        max -= 1;
+        count = 0;
+      } else
+        count++;
+      v = max - v;
+      dacPutChannelX(&DACD1, 0, dBm_to_volt[v] << 4);
+    } while(operation_requested == OP_NONE);
+  count = 0;
+//  dacPutChannelX(&DACD2, 0, 0);
+}
+#endif
 
 
 int16_t Si446x_RSSI(void)
@@ -2298,7 +2367,7 @@ static const RBW_t RBW_choices[] =
  {SI4463_RBW_850kHz,0,6000},
 };
 
-const int SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
+const uint8_t SI4432_RBW_count = ((int)(sizeof(RBW_choices)/sizeof(RBW_t)));
 
 static pureRSSI_t SI4463_RSSI_correction = float_TO_PURE_RSSI(-120);
 static int prev_band = -1;

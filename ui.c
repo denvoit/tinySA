@@ -2528,6 +2528,22 @@ ui_process_normal(void)
   }
 }
 
+#ifdef __LISTEN__
+bool
+ui_process_listen_lever(void)
+{
+  int status = btn_check();
+  if (status != 0) {
+    if (status & EVT_BUTTON_SINGLE_CLICK) {
+      return false;
+    } else {
+      lever_move_marker(status);
+    }
+  }
+  return true;
+}
+#endif
+
 static void
 ui_process_menu(void)
 {

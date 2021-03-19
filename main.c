@@ -154,6 +154,13 @@ static THD_FUNCTION(Thread1, arg)
       } else if (sweep_mode & SWEEP_REMOTE) {
       sweep_remote();
 #endif
+#ifdef __LISTEN__
+      } else if (sweep_mode & SWEEP_LISTEN) {
+      if (markers[active_marker].enabled == M_ENABLED) {
+          perform(false,0,frequencies[markers[active_marker].index], false);
+          SI4432_Listen(MODE_SELECT(setting.mode));
+      }
+#endif
 #ifdef __CALIBRATE__
       } else if (sweep_mode & SWEEP_CALIBRATE) {
       // call from lowest level to save stack space
@@ -1063,6 +1070,9 @@ void load_LCD_properties(void)
   setting.waterfall = W_OFF;
   memcpy(setting._trace, def_trace, sizeof(def_trace));
   memcpy(setting._markers, def_markers, sizeof(def_markers));
+#ifdef __LIMITS__
+  memset(setting.limits, 0, sizeof(setting.limits));
+#endif
 #ifdef __VNA__
   setting._velocity_factor =  0.7;
 #endif
@@ -2927,6 +2937,7 @@ int main(void)
  * by the Reference Manual.
  */
   dacStart(&DACD2, &dac1cfg1);
+  dacStart(&DACD1, &dac1cfg1);
 
   setup_sa();
   set_sweep_points(POINTS_COUNT);
