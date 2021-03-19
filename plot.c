@@ -1287,6 +1287,7 @@ static msg_t cellPut(void *ip, uint8_t ch) {
   }
   return MSG_OK;
 }
+static const struct cellprintStreamVMT cell_vmt_s = {NULL, NULL, cellPut, NULL};
 
 static msg_t cellPut7x13(void *ip, uint8_t ch) {
   screenPrintStream *ps = ip;
@@ -1297,7 +1298,11 @@ static msg_t cellPut7x13(void *ip, uint8_t ch) {
   }
   return MSG_OK;
 }
+static const struct cellprintStreamVMT cell_vmt_b = {NULL, NULL, cellPut7x13, NULL};
 
+//#define ENABLE_WIDE_FONT_ON_CELL
+
+#ifdef ENABLE_WIDE_FONT_ON_CELL
 static msg_t cellPut10x14(void *ip, uint8_t ch) {
   screenPrintStream *ps = ip;
   if (ps->x < CELLWIDTH){
@@ -1311,10 +1316,8 @@ static msg_t cellPut10x14(void *ip, uint8_t ch) {
   }
   return MSG_OK;
 }
-
-static const struct cellprintStreamVMT cell_vmt_s = {NULL, NULL, cellPut, NULL};
-static const struct cellprintStreamVMT cell_vmt_b = {NULL, NULL, cellPut7x13, NULL};
 static const struct cellprintStreamVMT cell_vmt_w = {NULL, NULL, cellPut10x14, NULL};
+#endif
 
 // Simple print in buffer function
 int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
@@ -1332,10 +1335,12 @@ int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
       if ((uint32_t)(y+bFONT_GET_HEIGHT) >= CELLHEIGHT + bFONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_b;
       break;
+#ifdef ENABLE_WIDE_FONT_ON_CELL
     case 'w':
       if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_w;
       break;
+#endif
     default: // Not defined!!
       return 0;
   }
