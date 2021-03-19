@@ -36,7 +36,7 @@ static void cell_blit_bitmap(int x, int y, uint16_t w, uint16_t h, const uint8_t
 static void draw_battery_status(void);
 static void update_waterfall(void);
 void cell_draw_test_info(int x0, int y0);
-static int cell_printf(int16_t x, int16_t y, const char *fmt, ...);
+int cell_printf(int16_t x, int16_t y, const char *fmt, ...);
 #ifndef wFONT_GET_DATA
 static void cell_drawstring_size(char *str, int x, int y, int size);
 #endif
@@ -1174,7 +1174,7 @@ cell_blit_bitmap(int x, int y, uint16_t w, uint16_t h, const uint8_t *bmp)
     }
   }
 }
-
+/*
 void
 cell_drawstring(char *str, int x, int y)
 {
@@ -1189,7 +1189,7 @@ cell_drawstring(char *str, int x, int y)
     x += w;
   }
 }
-
+*/
 static void
 cell_drawstring_7x13(char *str, int x, int y)
 {
@@ -1317,7 +1317,7 @@ static const struct cellprintStreamVMT cell_vmt_b = {NULL, NULL, cellPut7x13, NU
 static const struct cellprintStreamVMT cell_vmt_w = {NULL, NULL, cellPut10x14, NULL};
 
 // Simple print in buffer function
-static int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
+int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
   // skip always if right
   if (x>=CELLWIDTH) return 0;
   uint8_t font_type = *fmt++;
@@ -1473,30 +1473,25 @@ static void cell_draw_marker_info(int x0, int y0)
       float sr = index_to_value(markers[1].index);
 
       float ip = sl+ (sr - il)/2;
-      plot_printf(buf, sizeof buf, "OIP3: %4.1fdB", ip);
       j = 2;
       int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
       int ypos = 1 + (j/2)*(16) - y0;
-//      cell_drawstring_7x13(buf, xpos, ypos);
-      cell_drawstring(buf, xpos, ypos);
+      cell_printf(xpos, ypos, "sOIP3: %4.1fdB", ip);
 
       ip = sr+ (sl - ir)/2;
-      plot_printf(buf, sizeof buf, "OIP3: %4.1fdB", ip);
       j = 3;
       xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
       ypos = 1 + (j/2)*(16) - y0;
-//      cell_drawstring_7x13(buf, xpos, ypos);
-      cell_drawstring(buf, xpos, ypos);
+      cell_printf(xpos, ypos, "sOIP3: %4.1fdB", ip);
       break;
     }
 #if 0
     if (i >= 2 && in_selftest) {
-      plot_printf(buf, sizeof buf, "DO NOT SWITCH OFF!!");
       j = 2;
       int xpos = 1 + CELLOFFSETX +25 - x0;
       int ypos = 1 + 16 - y0;
 
-      cell_drawstring_7x13(buf, xpos, ypos);
+      cell_printf(xpos, ypos, "bDO NOT SWITCH OFF!!");
       break;
     }
 #endif
