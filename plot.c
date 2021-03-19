@@ -930,9 +930,10 @@ draw_cell(int m, int n)
         for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
       }
 #ifdef __CHANNEL_POWER__
+      c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
       if (setting.measurement == M_CP) {
         if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
-          for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = LCD_TRIGGER_COLOR;
+          for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
         }
       }
 #endif
