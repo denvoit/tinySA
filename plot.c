@@ -36,6 +36,7 @@ static void cell_blit_bitmap(int x, int y, uint16_t w, uint16_t h, const uint8_t
 static void draw_battery_status(void);
 static void update_waterfall(void);
 void cell_draw_test_info(int x0, int y0);
+static int cell_printf(int16_t x, int16_t y, const char *fmt, ...);
 #ifndef wFONT_GET_DATA
 static void cell_drawstring_size(char *str, int x, int y, int size);
 #endif
@@ -1266,11 +1267,94 @@ cell_drawstring_size(char *str, int x, int y, int size)
 }
 #endif
 
+
+struct cellprintStreamVMT {
+  _base_sequential_stream_methods
+};
+
+typedef struct {
+  const struct cellprintStreamVMT *vmt;
+  int16_t x;
+  int16_t y;
+} screenPrintStream;
+
+static msg_t cellPut(void *ip, uint8_t ch) {
+  screenPrintStream *ps = ip;
+  if (ps->x < CELLWIDTH){
+    uint16_t w = FONT_GET_WIDTH(ch);
+    cell_blit_bitmap(ps->x, ps->y, w, FONT_GET_HEIGHT, FONT_GET_DATA(ch));
+    ps->x+= w;
+  }
+  return MSG_OK;
+}
+
+static msg_t cellPut7x13(void *ip, uint8_t ch) {
+  screenPrintStream *ps = ip;
+  if (ps->x < CELLWIDTH){
+    uint16_t w = bFONT_GET_WIDTH(ch);
+    cell_blit_bitmap(ps->x, ps->y, w, bFONT_GET_HEIGHT, bFONT_GET_DATA(ch));
+    ps->x+= w;
+  }
+  return MSG_OK;
+}
+
+static msg_t cellPut10x14(void *ip, uint8_t ch) {
+  screenPrintStream *ps = ip;
+  if (ps->x < CELLWIDTH){
+#ifdef wFONT_GET_DATA
+    uint16_t w = wFONT_GET_WIDTH(ch);
+    cell_blit_bitmap(ps->x, ps->y, w, wFONT_GET_HEIGHT, wFONT_GET_DATA(ch));
+#else
+    w = cell_drawchar_size( ch, ps->x, ps->y, 2);
+#endif
+    ps->x+= w;
+  }
+  return MSG_OK;
+}
+
+static const struct cellprintStreamVMT cell_vmt_s = {NULL, NULL, cellPut, NULL};
+static const struct cellprintStreamVMT cell_vmt_b = {NULL, NULL, cellPut7x13, NULL};
+static const struct cellprintStreamVMT cell_vmt_w = {NULL, NULL, cellPut10x14, NULL};
+
+// Simple print in buffer function
+static int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
+  // skip always if right
+  if (x>=CELLWIDTH) return 0;
+  uint8_t font_type = *fmt++;
+  screenPrintStream ps;
+  // Select font and skip print if not on cell (at top/bottom)
+  switch (font_type){
+    case 's':
+      if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
+      ps.vmt = &cell_vmt_s;
+      break;
+    case 'b':
+      if ((uint32_t)(y+bFONT_GET_HEIGHT) >= CELLHEIGHT + bFONT_GET_HEIGHT) return 0;
+      ps.vmt = &cell_vmt_b;
+      break;
+    case 'w':
+      if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
+      ps.vmt = &cell_vmt_w;
+      break;
+    default: // Not defined!!
+      return 0;
+  }
+  va_list ap;
+  // Init small cell print stream
+  ps.x = x;
+  ps.y = y;
+  // Performing the print operation using the common code.
+  va_start(ap, fmt);
+  int retval = chvprintf((BaseSequentialStream *)(void *)&ps, fmt, ap);
+  va_end(ap);
+  // Return number of bytes that would have been written.
+  return retval;
+}
+
 extern float temppeakLevel;
 
 static void cell_grid_line_info(int x0, int y0)
 {
-  char buf[32];
   int xpos = GRID_X_TEXT - x0;
   int ypos = 0 - y0 + 2;
   ili9341_set_foreground(LCD_GRID_VALUE_COLOR);
@@ -1278,10 +1362,7 @@ static void cell_grid_line_info(int x0, int y0)
   float scale = get_trace_scale();
   for (int i = 0; i < NGRIDY; i++){
     if (ypos >= CELLHEIGHT) break;
-    if (ypos >= -FONT_GET_HEIGHT){
-      plot_printf(buf, sizeof buf, "% 7.3F", ref);
-      cell_drawstring(buf, xpos, ypos);
-    }
+    cell_printf(xpos, ypos, "s% 7.3F", ref);
     ypos+=GRIDY;
     ref-=scale;
   }
@@ -1305,16 +1386,13 @@ static void cell_draw_marker_info(int x0, int y0)
   }
 #ifdef __CHANNEL_POWER__
   if (setting.measurement==M_CP) {
+    ili9341_set_foreground(LCD_FG_COLOR);
     for (int c=0; c<3;c++) {
-      plot_printf(buf, sizeof buf, "%4.1fdBm", channel_power[c]);
       int xpos = 10 + (c)*(WIDTH/3) + CELLOFFSETX - x0;
       int ypos = 1 - y0;
-      ili9341_set_foreground(LCD_FG_COLOR);
-      cell_drawstring_7x13(buf, xpos, ypos);
-      plot_printf(buf, sizeof buf, "%4.1f%%", 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]) );
+      cell_printf(xpos, ypos, "b%4.1fdBm", channel_power[c]);
       ypos = 14 - y0;
-    ili9341_set_foreground(LCD_FG_COLOR);
-    cell_drawstring_7x13(buf, xpos, ypos);
+      cell_printf(xpos, ypos, "b%4.1f%%", 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]) );
     }
     return;
   }
