@@ -335,6 +335,12 @@ to_dBm(const float v)
     return v;  // raw data is in logmag*10 format
 }
 
+float
+dBm_to_Watt(const float v)
+{
+  return   logf(v*1000.0)*(10.0/logf(10.0));
+}
+
 static void
 trace_into_index_x_array(index_x_t *x, uint16_t points){
   // Not need update if index calculated for this points count
@@ -923,6 +929,13 @@ draw_cell(int m, int n)
       if (rectangular_grid_x(x + x0)) {
         for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
       }
+#ifdef __CHANNEL_POWER__
+      if (setting.measurement == M_CP) {
+        if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
+          for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = LCD_TRIGGER_COLOR;
+        }
+      }
+#endif
     }
     for (y = 0; y < h; y++) {
       if (rectangular_grid_y(y + y0)) {
@@ -1285,6 +1298,22 @@ static void cell_draw_marker_info(int x0, int y0)
       active++;
     }
   }
+#ifdef __CHANNEL_POWER__
+  if (setting.measurement==M_CP) {
+    for (int c=0; c<3;c++) {
+      plot_printf(buf, sizeof buf, "%4.1fdBm", channel_power[c]);
+      int xpos = 10 + (c)*(WIDTH/3) + CELLOFFSETX - x0;
+      int ypos = 1 - y0;
+      ili9341_set_foreground(LCD_FG_COLOR);
+      cell_drawstring_7x13(buf, xpos, ypos);
+      plot_printf(buf, sizeof buf, "%4.1f%%", 100.0 * channel_power_watt[c] /(channel_power_watt[0] + channel_power_watt[1] + channel_power_watt[2]) );
+      ypos = 14 - y0;
+    ili9341_set_foreground(LCD_FG_COLOR);
+    cell_drawstring_7x13(buf, xpos, ypos);
+    }
+    return;
+  }
+#endif
   if (setting.measurement == M_THD && active >= 1)
     active = 2;
   for (int i = 0; i < MARKER_COUNT; i++) {
@@ -1420,8 +1449,8 @@ static void cell_draw_marker_info(int x0, int y0)
       ili9341_set_background(LCD_BG_COLOR);
       uint16_t color;
       if ((!setting.subtract_stored) &&     // Disabled when normalized
-          ((setting.mode == M_LOW && temppeakLevel - get_attenuation() + setting.offset > -10) ||
-           (setting.mode == M_HIGH && temppeakLevel - get_attenuation()+ setting.offset > -29) ))
+          ((setting.mode == M_LOW && temppeakLevel - get_attenuation() + setting.external_gain > -10) ||
+           (setting.mode == M_HIGH && temppeakLevel - get_attenuation()+ setting.external_gain  > -29) ))
         color = LCD_BRIGHT_COLOR_RED;
       else
         color = marker_color(markers[i].mtype);

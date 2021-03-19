@@ -123,13 +123,13 @@ const char *info_about[]={
 };
 
 bool dirty = true;
-
 bool completed = false;
 
 #ifdef TINYSA4
 static THD_WORKING_AREA(waThread1, 1124);
 #else
 static THD_WORKING_AREA(waThread1, 768);
+bool has_esd = false;
 #endif
 static THD_FUNCTION(Thread1, arg)
 {
@@ -1022,7 +1022,7 @@ config_t config = {
   .cor_am = 0,
   .cor_wfm = 0,
   .cor_nfm = 0,
-  .ultra = false,
+  .ultra = true,
   .high_out_adf4350 = true,
   .ext_zero_level = 174,
 #endif
@@ -2278,6 +2278,10 @@ VNA_SHELL_FUNCTION(cmd_info)
   int i = 0;
   while (info_about[i])
     shell_printf("%s\r\n", info_about[i++]);
+#ifdef TINYSA3
+  if (has_esd)
+    shell_printf("ESD protected\r\n");
+#endif
 }
 #endif
 
@@ -2462,7 +2466,7 @@ static const VNAShellCommand commands[] =
     { "ultra_start", cmd_ultra_start, CMD_WAIT_MUTEX },
 #endif
     { "load", cmd_load,    0 },
-    { "offset", cmd_offset, 0},
+    { "ext_gain", cmd_ext_gain, 0},
     { "output", cmd_output,    0 },
     { "deviceid", cmd_deviceid,    0 },
     { "selftest", cmd_selftest,    0 },
@@ -2850,6 +2854,11 @@ int main(void)
   i2cStart(&I2CD1, &i2ccfg);
   si5351_init();
 #endif
+
+#ifdef TINYSA3
+  has_esd = ((palReadPort(GPIOB) & (1<<12)) ? false : true );
+#endif
+
 
 #ifdef __SI4432__
  /*

@@ -71,7 +71,7 @@ static freq_t real_old_freq[4] = { 0, 0, 0, 0};
 #endif
 
 #ifdef TINYSA4
-const float si_drive_dBm []     = {-41, -30, -21, -17, -12, -11, -10, -8.5, -7.5, -6.5, -5.5, -4.5, -3.5, -3 ,  -2,  -1.5, -1, -0.5, 0};
+const float si_drive_dBm []     = {-41, -30, -21, -17, -14, -11, -10, -8, -7, -6, -5, -4, -3, -2.5 ,  -2,  -1.5, -1, -0.5, 0};
 const float adf_drive_dBm[]     = {-15,-12,-9,-6};
 const uint8_t drive_register[]  = {0,   1,   2,   3,   4,   5,  6,   6,    8,    9,    10,   11,   12,   13,   14,  15,  16,  17,   18};
 float *drive_dBm = (float *) adf_drive_dBm;
@@ -92,7 +92,7 @@ const int8_t drive_dBm [16] = {-38, -32, -30, -27, -24, -19, -15, -12, -5, -2, 0
 #define SL_GENHIGH_LEVEL_MAX    drive_dBm[MAX_DRIVE]
 
 #define SL_GENLOW_LEVEL_MIN    -104
-#define SL_GENLOW_LEVEL_MAX   -14
+#define SL_GENLOW_LEVEL_MAX   -16
 
 
 #else
@@ -114,6 +114,8 @@ float level_min;
 float level_max;
 float level_range;
 
+float channel_power[3];
+float channel_power_watt[3];
 
 //int setting.refer = -1;  // Off by default
 const uint32_t reffer_freq[] = {30000000, 15000000, 10000000, 4000000, 3000000, 2000000, 1000000};
@@ -223,8 +225,8 @@ void reset_settings(int m)
   setting.frequency_IF = DEFAULT_IF;
 #endif
   setting.auto_IF = true;
-  set_offset(0.0);  // This also updates the help text!!!!!
-  //setting.offset = 0.0;
+  set_external_gain(0.0);  // This also updates the help text!!!!!
+  //setting.external_gain = 0.0;
   setting.trigger = T_AUTO;
   setting.trigger_direction = T_UP;
   setting.trigger_mode = T_MID;
@@ -1210,13 +1212,13 @@ void set_scale(float t) {
 
 extern char low_level_help_text[12];
 
-void set_offset(float offset)
+void set_external_gain(float external_gain)
 {
-  setting.offset = offset;
+  setting.external_gain = external_gain;
   int min,max;
   min = level_min;
   max = min + level_range;
-  plot_printf(low_level_help_text, sizeof low_level_help_text, "%+d..%+d", min + (int)offset, max + (int)offset);
+  plot_printf(low_level_help_text, sizeof low_level_help_text, "%+d..%+d", min - (int)external_gain, max - (int)external_gain);
   redraw_request|=REDRAW_AREA;
   dirty = true;             // No HW update required, only status panel refresh but need to ensure the cached value is updated in the calculation of the RSSI
 }
@@ -2238,9 +2240,9 @@ static void calculate_static_correction(void)                   // Calculate the
 #ifdef TINYSA4
           - (S_STATE(setting.agc)? 0 : 33)
           - (S_STATE(setting.lna)? 0 : 0)
-          + (setting.extra_lna ? -23.0 : 0)                         // TODO <------------------------- set correct value
+          + (setting.extra_lna ? -25.5 : 0)                         // TODO <------------------------- set correct value
 #endif		  
-          - setting.offset);
+          - setting.external_gain);
 }
 
 int hsical = -1;
@@ -2276,6 +2278,7 @@ void clock_at_48MHz(void)
     RCC->CR &= RCC_CR_HSICAL;
     RCC->CR |= ( (hsical) << 8 );
     RCC->CR &= RCC_CR_HSITRIM | RCC_CR_HSION; /* CR Reset value.              */
+    RCC->CR |= RCC_CR_HSITRIM_4;
   }
 }
 
@@ -3451,7 +3454,7 @@ sweep_again:                                // stay in sweep loop when output mo
     setting.atten_step = false;     // No step attenuate in low mode auto attenuate
     int changed = false;
     int delta = 0;
-    int actual_max_level = (max_index[0] == 0 ? -100 :(int) (actual_t[max_index[0]] - get_attenuation()) ); // If no max found reduce attenuation
+    int actual_max_level = (max_index[0] == 0 ? -100 :(int) (actual_t[max_index[0]] - get_attenuation()) ) + setting.external_gain; // If no max found reduce attenuation
     if (actual_max_level < AUTO_TARGET_LEVEL && setting.attenuate_x2 > 0) {
       delta = - (AUTO_TARGET_LEVEL - actual_max_level);
     } else if (actual_max_level > AUTO_TARGET_LEVEL && setting.attenuate_x2 < 60) {
@@ -3494,7 +3497,7 @@ sweep_again:                                // stay in sweep loop when output mo
 #ifdef __SI4432__
   if (!in_selftest && MODE_INPUT(setting.mode)) {
     if (S_IS_AUTO(setting.agc)) {
-      int actual_max_level = actual_t[max_index[0]] - get_attenuation();        // No need to use float
+      int actual_max_level = actual_t[max_index[0]] - get_attenuation() + setting.external_gain;        // No need to use float
       if (UNIT_IS_LINEAR(setting.unit)) { // Auto AGC in linear mode
         if (actual_max_level > - 45)
           auto_set_AGC_LNA(false, 0); // Strong signal, no AGC and no LNA
@@ -3690,7 +3693,7 @@ sweep_again:                                // stay in sweep loop when output mo
     } else if (setting.measurement == M_AM) {      // ----------------AM measurement
       if (S_IS_AUTO(setting.agc )) {
 #ifdef __SI4432__
-        int actual_level = actual_t[max_index[0]] - get_attenuation();  // no need for float
+        int actual_level = actual_t[max_index[0]] - get_attenuation() + setting.external_gain;  // no need for float
         if (actual_level > -20 ) {
           setting.agc = S_AUTO_OFF;
           setting.lna = S_AUTO_OFF;
@@ -3704,6 +3707,22 @@ sweep_again:                                // stay in sweep loop when output mo
         set_AGC_LNA();
 #endif
       }
+#ifdef __CHANNEL_POWER__
+      } else if (setting.measurement == M_CP) {      // ----------------CHANNEL_POWER measurement
+        int old_unit = setting.unit;
+        setting.unit = U_WATT;
+        for (int c = 0; c < 3 ;c++) {
+          channel_power_watt[c] = 0.0;
+          int sp_div3 = sweep_points/3;
+          for (int i =0; i < sp_div3; i++) {
+            channel_power_watt[c] += index_to_value(i + c*sp_div3);
+          }
+          float rbw_cor =  (float)(get_sweep_frequency(ST_SPAN)/3) / ((float)actual_rbw_x10 * 100.0);
+          channel_power_watt[c] = channel_power_watt[c] * rbw_cor /(float)sp_div3;
+          channel_power[c] = to_dBm(channel_power_watt[c]);
+        }
+        setting.unit = old_unit;
+#endif
     }
 
 #endif
@@ -3920,18 +3939,21 @@ enum {
 };
 
 enum {
-  TP_SILENT, TPH_SILENT, TP_10MHZ, TP_10MHZEXTRA, TP_10MHZ_SWITCH, TP_30MHZ, TPH_30MHZ, TPH_30MHZ_SWITCH
+  TP_SILENT, TPH_SILENT, TP_10MHZ, TP_10MHZEXTRA, TP_10MHZ_SWITCH, TP_30MHZ, TPH_30MHZ, TPH_30MHZ_SWITCH,
+#ifdef TINYSA4
+  TP_30MHZ_ULTRA, TP_30MHZ_LNA,
+#endif
 };
 
 #define TEST_COUNT  (sizeof test_case / sizeof test_case[0])
 
 #define W2P(w) (sweep_points * w / 100)     // convert width in % to actual sweep points
 
-//#ifdef TINYSA4
-//#define CAL_LEVEL   -30
-//#else
-#define CAL_LEVEL   -25
-//#endif
+#ifdef TINYSA4
+#define CAL_LEVEL   -23.5
+#else
+#define CAL_LEVEL   (has_esd ? -26.2 : -25)
+#endif
 
 // TODO made more compact this structure (need use aligned data)
 typedef struct test_case {
@@ -3950,34 +3972,35 @@ typedef struct test_case {
 const test_case_t test_case [] =
 #ifdef TINYSA4
 {//                 Condition   Preparation     Center  Span    Pass    Width(%)Stop
- TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      0.005,  0.01,   0,      0,      0),         // 1 Zero Hz leakage
- TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      0.015,   0.01,   -30,    0,      0),         // 2 Phase noise of zero Hz
- TEST_CASE_STRUCT(TC_SIGNAL,    TP_30MHZ,       30,     7,      -30,    10,     -90),      // 3
- TEST_CASE_STRUCT(TC_SIGNAL,    TP_30MHZ,       60,     7,      -70,    10,     -90),      // 4
+ TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      0.05,  0.1,   -10,      0,      0),         // 1 Zero Hz leakage
+ TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      0.1,   0.1,   -70,    0,      0),         // 2 Phase noise of zero Hz
+ TEST_CASE_STRUCT(TC_SIGNAL,    TP_30MHZ,       30,     1,      -23,   10,     -85),      // 3
+ TEST_CASE_STRUCT(TC_SIGNAL,    TP_30MHZ_ULTRA, 900,    1,      -75,    10,     -85),      // 4
 #define TEST_SILENCE 4
- TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      200,    100,    -75,    0,      0),         // 5  Wide band noise floor low mode
- TEST_CASE_STRUCT(TC_BELOW,     TPH_SILENT,     600,    720,    -75,    0,      0),         // 6 Wide band noise floor high mode
- TEST_CASE_STRUCT(TC_SIGNAL,    TP_10MHZEXTRA,  30,     14,      -20,    27,     -80),      // 7 BPF loss and stop band
+ TEST_CASE_STRUCT(TC_BELOW,     TP_SILENT,      200,    100,    -70,    0,      0),         // 5  Wide band noise floor low mode
+ TEST_CASE_STRUCT(TC_BELOW,     TPH_SILENT,     633,    994,    -85,    0,      0),         // 6 Wide band noise floor high mode
+ TEST_CASE_STRUCT(TC_SIGNAL,    TP_10MHZEXTRA,  30,     14,      -20,    27,     -70),      // 7 BPF loss and stop band
  TEST_CASE_STRUCT(TC_FLAT,      TP_10MHZEXTRA,  30,     14,      -18,    9,     -60),       // 8 BPF pass band flatness
- TEST_CASE_STRUCT(TC_BELOW,     TP_30MHZ,       400,    60,     -75,    0,      -75),       // 9 LPF cutoff
- TEST_CASE_STRUCT(TC_SIGNAL,    TP_10MHZ_SWITCH,20,     7,      -39,    10,     -60),      // 10 Switch isolation using high attenuation
- TEST_CASE_STRUCT(TC_DISPLAY,     TP_30MHZ,       30,     0,      -25,    145,     -60),      // 11 Measure atten step accuracy
+ TEST_CASE_STRUCT(TC_BELOW,     TP_30MHZ,       900,    1,     -90,    0,      -90),       // 9 LPF cutoff
+ TEST_CASE_STRUCT(TC_SIGNAL,    TP_10MHZ_SWITCH,20,     7,      -29,    10,     -50),      // 10 Switch isolation using high attenuation
+ TEST_CASE_STRUCT(TC_DISPLAY,     TP_30MHZ,       30,     0,      -25,    145,     -60),      // 11 test display
  TEST_CASE_STRUCT(TC_ATTEN,     TP_30MHZ,       30,     0,      CAL_LEVEL,    145,     -60),      // 12 Measure atten step accuracy
-#define TEST_END 12
+ TEST_CASE_STRUCT(TC_SIGNAL,    TP_30MHZ_LNA,       30,     5,      -23,   10,     -75),      // 13 Measure LNA
+#define TEST_END 13
  TEST_CASE_STRUCT(TC_END,       0,              0,      0,      0,      0,      0),
-#define TEST_POWER  13
+#define TEST_POWER  14
  TEST_CASE_STRUCT(TC_MEASURE,   TP_30MHZ,       30,     7,      CAL_LEVEL,   10,     -55),      // 12 Measure power level and noise
  TEST_CASE_STRUCT(TC_MEASURE,   TP_30MHZ,       270,    4,      -50,    10,     -75),       // 13 Measure powerlevel and noise
  TEST_CASE_STRUCT(TC_MEASURE,   TPH_30MHZ,      270,    4,      -40,    10,     -65),       // 14 Calibrate power high mode
  TEST_CASE_STRUCT(TC_END,       0,              0,      0,      0,      0,      0),
-#define TEST_RBW    17
+#define TEST_RBW    18
  TEST_CASE_STRUCT(TC_MEASURE,   TP_30MHZ,       30,     1,      CAL_LEVEL,    10,     -60),      // 16 Measure RBW step time
  TEST_CASE_STRUCT(TC_END,       0,              0,      0,      0,      0,      0),
  TEST_CASE_STRUCT(TC_MEASURE,   TPH_30MHZ,      300,    4,      -48,    10,     -65),       // 14 Calibrate power high mode
  TEST_CASE_STRUCT(TC_MEASURE,   TPH_30MHZ_SWITCH,300,    4,      -40,    10,     -65),       // 14 Calibrate power high mode
-#define TEST_ATTEN    21
+#define TEST_ATTEN    22
  TEST_CASE_STRUCT(TC_ATTEN,      TP_30MHZ,       30,     0,      -25,    145,     -60),      // 20 Measure atten step accuracy
-#define TEST_SPUR    22
+#define TEST_SPUR    23
  TEST_CASE_STRUCT(TC_BELOW,      TP_SILENT,     144,     8,      -95,    0,     0),       // 22 Measure 48MHz spur
 };
 #else
@@ -4097,7 +4120,7 @@ int validate_signal_within(int i, float margin)
     markers[0].index = (markers[2].index + markers[1].index)/2;
   }
   test_fail_cause[i] = "Frequency ";
-  if (peakFreq < test_case[i].center * 1000000 - 100000 || test_case[i].center * 1000000 + 100000 < peakFreq )
+  if (peakFreq < test_case[i].center * 1000000 - 400000 || test_case[i].center * 1000000 + 400000 < peakFreq )
     return TS_FAIL;
   test_fail_cause[i] = "";
   return TS_PASS;
@@ -4308,6 +4331,9 @@ void test_prepare(int i)
   setting.atten_step = false;
 #ifdef TINYSA4
   setting.frequency_IF = config.frequency_IF1;                // Default frequency
+  config.ultra = true;
+  config.ultra_threshold = 2000000000;
+  setting.extra_lna = false;
 #else
   setting.frequency_IF = DEFAULT_IF;                // Default frequency
 #endif
@@ -4370,9 +4396,13 @@ common_silent:
     for (int j = setting._sweep_points/2 - W2P(test_case[i].width); j < setting._sweep_points/2 + W2P(test_case[i].width); j++)
       stored_t[j] = test_case[i].pass;
     break;
+#ifdef TINYSA4
+  case TP_30MHZ_ULTRA:
+  case TP_30MHZ_LNA:
+#endif
   case TP_30MHZ:
     set_mode(M_LOW);
-    maxFreq = 520000000;            // needed to measure the LPF rejection
+    maxFreq = 2000000000;            // needed to measure the LPF rejection
     set_refer_output(0);
     dirty = true;
  //   set_step_delay(1);                      // Do not set !!!!!
@@ -4389,6 +4419,15 @@ common_silent:
     goto common;
   }
   switch(test_case[i].setup) {                // Prepare test conditions
+#ifdef TINYSA4
+  case TP_30MHZ_ULTRA:
+    config.ultra_threshold = 0;
+    break;
+  case TP_30MHZ_LNA:
+    setting.extra_lna = true;
+    chThdSleepMilliseconds(200);
+    break;
+#endif
   case TP_10MHZ_SWITCH:
     set_attenuation(32);                        // This forces the switch to transmit so isolation can be tested
     break;
@@ -4486,6 +4525,12 @@ void self_test(int test)
     sweep_mode = SWEEP_ENABLE;
 
     ili9341_clear_screen();
+#ifdef TINYSA4
+    config_recall();
+    config.cor_am = 0;
+    config.cor_nfm = 0;
+    config.cor_wfm = 0;
+#endif
     reset_settings(M_LOW);
     set_refer_output(-1);
 #ifdef TINYSA4

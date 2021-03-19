@@ -69,8 +69,9 @@
 #define __QUASI_PEAK__            // Add quasi peak average option
 #define __REMOTE_DESKTOP__        // Add remote desktop option
 #define __LISTEN__
-#ifdef TINYSA4
+#define __CHANNEL_POWER__
 #define __LIMITS__
+#ifdef TINYSA4
 #define  __HARMONIC__
 #else
 #endif
@@ -83,7 +84,7 @@
 #define HIGH_MAX_FREQ_MHZ   960
 #endif
 #ifdef TINYSA4
-#define DEFAULT_IF  ((freq_t)977100000)
+#define DEFAULT_IF  ((freq_t)977400000)
 #define DEFAULT_SPUR_OFFSET ((freq_t)1500000)
 #define DEFAULT_MAX_FREQ    ((freq_t)800000000)
 #define HIGH_MIN_FREQ_MHZ   136// 825
@@ -119,6 +120,7 @@
 #ifdef TINYSA3
 typedef uint32_t freq_t;
  typedef int32_t long_t;
+ extern bool has_esd;
 #endif
 #ifdef TINYSA4
  typedef uint64_t freq_t;
@@ -271,6 +273,8 @@ void set_extra_lna(int t);
 extern float level_min;
 extern float level_max;
 extern float level_range;
+extern float channel_power[3];
+extern float channel_power_watt[3];
 
 extern const char * const unit_string[];
 #ifdef TINYSA4
@@ -576,6 +580,7 @@ enum unit_type {
 #define UNIT_IS_LOG(T) ( T >= U_VOLT ? false : true)
 
 float value(float);
+float index_to_value(const int i);
 
 typedef struct trace {
   uint8_t enabled;
@@ -913,7 +918,7 @@ typedef struct setting
   uint8_t measurement;         // enum
   uint8_t spur_removal;        // enum
 
-  int8_t  tracking;            // -1...1 !!! need convert to bool
+  int8_t  tracking;            // -1...1 Can NOT convert to bool!!!!!!
   uint8_t atten_step;          //  0...1 !!! need convert to bool
   int8_t _active_marker;       // -1...MARKER_MAX
   uint8_t unit_scale_index;    // table index
@@ -952,7 +957,7 @@ typedef struct setting
 
   float reflevel;
   float scale;
-  float offset;
+  float external_gain;
   float trigger_level;
   float level;
   float level_sweep;
@@ -1283,7 +1288,7 @@ void toggle_tracking(void);
 void toggle_hambands(void);
 void reset_calibration(void);
 void set_reflevel(float);
-void set_offset(float);
+void set_external_gain(float);
 void set_unit(int);
 void set_switches(int);
 void set_gridlines(int);
@@ -1297,13 +1302,14 @@ void self_test(int);
 void wait_user(void);
 void calibrate(void);
 float to_dBm(float);
+float dBm_to_Watt(float);
 uint32_t calc_min_sweep_time_us(void);
 pureRSSI_t perform(bool b, int i, freq_t f, int e);
 void interpolate_maximum(int m);
 void calibrate_modulation(int modulation, int8_t *correction);
 
 enum {
-  M_OFF, M_IMD, M_OIP3, M_PHASE_NOISE, M_STOP_BAND, M_PASS_BAND, M_LINEARITY, M_AM, M_FM, M_THD
+  M_OFF, M_IMD, M_OIP3, M_PHASE_NOISE, M_STOP_BAND, M_PASS_BAND, M_LINEARITY, M_AM, M_FM, M_THD, M_CP,
 };
 
 enum {

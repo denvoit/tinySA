@@ -504,6 +504,10 @@ show_version(void)
     do {shift>>=1; y+=5;} while (shift&1);
     ili9341_drawstring(info_about[i++], x, y+=5);
   }
+#ifdef TINYSA3
+  if (has_esd)
+    ili9341_drawstring("ESD protected", x, y+=5);
+#endif
 #ifdef TINYSA4
 extern const char *states[];
   #define ENABLE_THREADS_COMMAND
@@ -2072,7 +2076,7 @@ menu_select_touch(int i, int pos)
               check_frequency_slider(slider_freq);
          }
         } else if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_LOWOUTLEVEL) {
-            uistat.value =  setting.offset + ((touch_x - OFFSETX+4) * level_range ) / (MENU_FORM_WIDTH-8) + level_min ;
+            uistat.value =  setting.external_gain + ((touch_x - OFFSETX+4) * level_range ) / (MENU_FORM_WIDTH-8) + level_min ;
          apply_step:
             set_keypad_value(keypad);
          apply:
@@ -2112,7 +2116,7 @@ menu_select_touch(int i, int pos)
         step = +10;
         break;
       }
-      uistat.value = setting.offset + get_level() + step;
+      uistat.value = setting.external_gain + get_level() + step;
       do_exit = true;
       goto apply_step;
     } else if (menu_is_form(menu) && MT_MASK(menu[i].type) == MT_KEYPAD && keypad == KM_CENTER) {

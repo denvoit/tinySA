@@ -267,14 +267,14 @@ VNA_SHELL_FUNCTION(cmd_sweeptime)
 
 
 
-VNA_SHELL_FUNCTION(cmd_offset)
+VNA_SHELL_FUNCTION(cmd_ext_gain)
 {
   if (argc != 1) {
-    shell_printf("usage: offset -100.0..+100.0\r\n");
+    shell_printf("usage: ext_gain -100.0..+100.0\r\n");
     return;
   }
   float o = my_atof(argv[0]);
-  set_offset(o);
+  set_external_gain(o);
 }
 
 
@@ -835,7 +835,7 @@ VNA_SHELL_FUNCTION(cmd_correction)
   if (argc == 0) {
     shell_printf("index frequency value\r\n");
     for (int i=0; i<CORRECTION_POINTS; i++) {
-      shell_printf("%d %D%.1f\r\n", i, setting.correction_frequency[i], setting.correction_value[i]);
+      shell_printf("%d %D %.1f\r\n", i, setting.correction_frequency[i], setting.correction_value[i]);
     }
     return;
   }

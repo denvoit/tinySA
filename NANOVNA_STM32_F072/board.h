@@ -247,7 +247,7 @@
                                      PIN_MODE_OUTPUT(GPIO_RF_PWR) |          \
                                      PIN_MODE_OUTPUT(GPIO_SPI2_CLK) |          \
                                      PIN_MODE_OUTPUT(11) |          \
-                                     PIN_MODE_OUTPUT(12) | \
+                                     PIN_MODE_INPUT(12) | \
                                      PIN_MODE_OUTPUT(13) | \
                                      PIN_MODE_INPUT(GPIO_SPI2_SDO) | \
                                      PIN_MODE_OUTPUT(GPIO_SPI2_SDI))
