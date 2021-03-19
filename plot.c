@@ -206,8 +206,6 @@ const ham_bands_t ham_bands[] =
 
 int ham_band(int x)      // Search which index in the frequency tabled matches with frequency  f using actual_rbw
 {
-  if (!config.hambands)
-    return false;
   freq_t f = frequencies[x];
   int L = 0;
   int R =  (sizeof ham_bands)/sizeof(freq_t) - 1;
@@ -921,22 +919,9 @@ draw_cell(int m, int n)
   // Draw rectangular plot (40 system ticks for all screen calls)
   if (trace_type & RECTANGULAR_GRID_MASK) {
     for (x = 0; x < w; x++) {
-#ifdef __HAM_BAND__
-      if (ham_band(x+x0)) {
-        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = GET_PALTETTE_COLOR(LCD_HAM_COLOR);
-      }
-#endif
       if (rectangular_grid_x(x + x0)) {
         for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
       }
-#ifdef __CHANNEL_POWER__
-      c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
-      if (setting.measurement == M_CP) {
-        if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
-          for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
-        }
-      }
-#endif
     }
     for (y = 0; y < h; y++) {
       if (rectangular_grid_y(y + y0)) {
@@ -946,7 +931,23 @@ draw_cell(int m, int n)
       }
     }
   }
-
+#ifdef __HAM_BAND__
+  if (config.hambands){
+    c = GET_PALTETTE_COLOR(LCD_HAM_COLOR);
+    for (x = 0; x < w; x++)
+      if (ham_band(x+x0))
+        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
+  }
+#endif
+#ifdef __CHANNEL_POWER__
+  if (setting.measurement == M_CP) {
+    c = GET_PALTETTE_COLOR(LCD_TRIGGER_COLOR);
+    for (x = 0; x < w; x++)
+      if (x+x0 == WIDTH/3 || x+x0 == 2*WIDTH/3 ) {
+        for (y = 0; y < h; y++) cell_buffer[y * CELLWIDTH + x] = c;
+    }
+  }
+#endif
 //  PULSE;
 #endif
 // Draw trigger line
@@ -1059,10 +1060,13 @@ draw_all_cells(bool flush_markmap)
 {
   int m, n;
 //  START_PROFILE
-  for (m = 0; m < (area_width+CELLWIDTH-1) / CELLWIDTH; m++)
-    for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++)
-      if ((markmap[0][n] | markmap[1][n]) & (1 << m))
+  for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++){
+    map_t update_map = markmap[0][n] | markmap[1][n];
+    if (update_map == 0) continue;
+    for (m = 0; update_map; update_map>>=1, m++)
+      if (update_map & 1)
         draw_cell(m, n);
+  }
 #if 0
   // Used for debug control cell update
   ili9341_bulk_finish();
