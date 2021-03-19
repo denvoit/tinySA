@@ -1303,7 +1303,7 @@ static msg_t cellPut10x14(void *ip, uint8_t ch) {
   if (ps->x < CELLWIDTH){
 #ifdef wFONT_GET_DATA
     uint16_t w = wFONT_GET_WIDTH(ch);
-    cell_blit_bitmap(ps->x, ps->y, w, wFONT_GET_HEIGHT, wFONT_GET_DATA(ch));
+    cell_blit_bitmap(ps->x, ps->y, w <=8 ? 9 : w, wFONT_GET_HEIGHT, wFONT_GET_DATA(ch));
 #else
     w = cell_drawchar_size( ch, ps->x, ps->y, 2);
 #endif
@@ -1508,6 +1508,7 @@ static void cell_draw_marker_info(int x0, int y0)
       if (!trace[t].enabled)
         continue;
       int k = 0;
+      buf[k++] = (active > 1) ? 's' : 'b';
       if (i == active_marker) {
 //        ili9341_set_foreground(LCD_BG_COLOR);
 //        ili9341_set_background(marker_color(markers[i].mtype));
@@ -1553,10 +1554,7 @@ static void cell_draw_marker_info(int x0, int y0)
       int xpos = 1 + CELLOFFSETX - x0;
       int ypos = 1 + j*(FONT_GET_HEIGHT*2+1) - y0;
 #endif
-      if (/* strlen(buf)*7> WIDTH/2 && */active > 1)
-        cell_drawstring(buf, xpos, ypos);
-      else
-        cell_drawstring_7x13(buf, xpos, ypos);
+      cell_printf(xpos, ypos, buf);
       j++;
    }
   }
