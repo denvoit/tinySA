@@ -1327,16 +1327,16 @@ int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
   screenPrintStream ps;
   // Select font and skip print if not on cell (at top/bottom)
   switch (font_type){
-    case 's':
+    case FONT_s[0]:
       if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_s;
       break;
-    case 'b':
+    case FONT_b[0]:
       if ((uint32_t)(y+bFONT_GET_HEIGHT) >= CELLHEIGHT + bFONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_b;
       break;
 #ifdef ENABLE_WIDE_FONT_ON_CELL
-    case 'w':
+    case FONT_w[0]:
       if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_w;
       break;
