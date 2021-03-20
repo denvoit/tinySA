@@ -1601,21 +1601,20 @@ redraw_frame(void)
 
 int display_test(void)
 {
-//  return true;
   // write and read display, return false on fail.
   for (int h = 0; h < LCD_HEIGHT; h++) {
-      for (int w = 0; w < LCD_WIDTH; w++) {
-        spi_buffer[w] =  ((w*h) & 0xfff);
-      }
-      ili9341_bulk(0, h, LCD_WIDTH, 1);
-      for (int w = 0; w < LCD_WIDTH; w++) {
-        spi_buffer[w] = 0;
-      }
-      ili9341_read_memory(0, h, LCD_WIDTH, 1, spi_buffer);
-      for (int w = 0; w < LCD_WIDTH; w++) {
-        if (spi_buffer[w] != ((w*h) & 0xfff))
-          return false;
-      }
+    // write test pattern to LCD
+    for (int w = 0; w < LCD_WIDTH; w++)
+      spi_buffer[w] = w*h;
+    ili9341_bulk(0, h, LCD_WIDTH, 1);
+    // Cleanup buffer
+    memset(spi_buffer, 0, LCD_WIDTH * sizeof(pixel_t));
+    // try read data
+    ili9341_read_memory(0, h, LCD_WIDTH, 1, spi_buffer);
+    // Check pattern from data
+    for (int w = 0; w < LCD_WIDTH; w++)
+      if (spi_buffer[w] != w*h)
+        return false;
   }
   return true;
 }
