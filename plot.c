@@ -1486,9 +1486,10 @@ static void cell_draw_marker_info(int x0, int y0)
       if (!trace[t].enabled)
         continue;
       uint16_t color;
+      int level = temppeakLevel - get_attenuation() + setting.external_gain;
       if ((!setting.subtract_stored) &&     // Disabled when normalized
-          ((setting.mode == M_LOW  && temppeakLevel - get_attenuation() + setting.external_gain > -10) ||
-           (setting.mode == M_HIGH && temppeakLevel - get_attenuation() + setting.external_gain > -29) ))
+          ((setting.mode == M_LOW  && level > -10) ||
+           (setting.mode == M_HIGH && level > -29) ))
         color = LCD_BRIGHT_COLOR_RED;
       else
         color = marker_color(markers[i].mtype);
