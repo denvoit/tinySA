@@ -551,13 +551,14 @@ extern const uint8_t numfont16x22[];
 #define S_OHM      "\036"  // 0x1E
 #define S_DEGREE   "\037"  // 0x1F
 
-// String prefix for select font size
-#define  FONT_s     "s"
-#define _FONT_s     's'
-#define  FONT_b     "b"
-#define _FONT_b     'b'
-#define  FONT_w     "w"
-#define _FONT_w     'w'
+// String prefix for select font size (use not printable chars)
+#define  FONT_s     "\001"
+#define _FONT_s     1
+// bold as default
+#define  FONT_b     ""
+#define _FONT_b     2
+#define  FONT_w     "\003"
+#define _FONT_w     3
 
 // Max palette indexes in config
 #define MAX_PALETTE     32

@@ -1346,9 +1346,10 @@ static void trace_print_value_string(     // Only used at one place
   }
   const char *format;
   if (UNIT_IS_LINEAR(setting.unit))
-    format = bold ? FONT_b"%s %.3F%s%s" : FONT_s"%s %.3F%s%s"; // 5 characters incl u, m, etc...
+    format = FONT_s"%s %.3F%s%s"; // 5 characters incl u, m, etc...
   else
-    format = bold ? FONT_b"%s %.1f%s%s" : FONT_s"%s %.1f%s%s";
+    format = FONT_s"%s %.1f%s%s";
+  if (bold) format++; // Skip small prefix for bold output
   cell_printf(xpos, ypos, format, buf2, v, unit_string[unit_index], (mtype & M_NOISE?"/Hz":""));
 }
 
