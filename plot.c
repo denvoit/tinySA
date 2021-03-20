@@ -974,7 +974,7 @@ static void
 draw_all_cells(bool flush_markmap)
 {
   int m, n;
-  START_PROFILE
+//  START_PROFILE
   for (n = 0; n < (area_height+CELLHEIGHT-1) / CELLHEIGHT; n++){
     map_t update_map = markmap[0][n] | markmap[1][n];
     if (update_map == 0) continue;
@@ -999,7 +999,7 @@ draw_all_cells(bool flush_markmap)
   }
   // Flush LCD buffer, wait completion (need call after end use ili9341_bulk_continue mode)
   ili9341_bulk_finish();
-  STOP_PROFILE
+//  STOP_PROFILE
 }
 
 void
