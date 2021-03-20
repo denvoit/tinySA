@@ -1189,7 +1189,7 @@ cell_drawstring(char *str, int x, int y)
     x += w;
   }
 }
-*/
+
 static void
 cell_drawstring_7x13(char *str, int x, int y)
 {
@@ -1204,7 +1204,7 @@ cell_drawstring_7x13(char *str, int x, int y)
     x += w;
   }
 }
-
+*/
 void
 cell_drawstring_10x14(char *str, int x, int y)
 {
@@ -1327,16 +1327,16 @@ int cell_printf(int16_t x, int16_t y, const char *fmt, ...) {
   screenPrintStream ps;
   // Select font and skip print if not on cell (at top/bottom)
   switch (font_type){
-    case FONT_s[0]:
+    case _FONT_s:
       if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_s;
       break;
-    case FONT_b[0]:
+    case _FONT_b:
       if ((uint32_t)(y+bFONT_GET_HEIGHT) >= CELLHEIGHT + bFONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_b;
       break;
 #ifdef ENABLE_WIDE_FONT_ON_CELL
-    case FONT_w[0]:
+    case _FONT_w:
       if ((uint32_t)(y+FONT_GET_HEIGHT) >= CELLHEIGHT + FONT_GET_HEIGHT) return 0;
       ps.vmt = &cell_vmt_w;
       break;
@@ -1412,12 +1412,11 @@ static void cell_draw_marker_info(int x0, int y0)
           f = markers[2].frequency-markers[1].frequency;
         else
           f = markers[1].frequency-markers[2].frequency;
-        plot_printf(buf, sizeof buf, "WIDTH: %8.3QHz", f);
-    show_computed:
+
         j = 3;
         int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
         int ypos = 1 + (j/2)*(16) - y0;
-        cell_drawstring_7x13(buf, xpos, ypos);
+        cell_printf(xpos, ypos, FONT_b"WIDTH: %8.3QHz", f);
         //        cell_drawstring(buf, xpos, ypos);
       } else if (setting.measurement == M_AM){
 #ifdef AM_IN_VOLT
@@ -1438,15 +1437,19 @@ static void cell_draw_marker_info(int x0, int y0)
 //                  powf(10.0, level            /20.0 ) *  powf(10.0, 6.02/20.0 + 2.0);
         int depth =       expf(level*(logf(10.0)/20.0)) * (powf(10.0, 6.02/20.0 + 2.0));
 #endif
-        plot_printf(buf, sizeof buf, "DEPTH: %3d%%", depth);
-        goto show_computed;
+        j = 3;
+        int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
+        int ypos = 1 + (j/2)*(16) - y0;
+        cell_printf(xpos, ypos, FONT_b"DEPTH: %3d%%", depth);
       } else if (setting.measurement == M_FM){
         freq_t dev = markers[1].frequency + actual_rbw_x10 * 100;      // Temp value to prevent calculation of negative deviation
         if ( markers[2].frequency < dev)
           break;
         dev = ( markers[2].frequency - dev ) >> 1;
-        plot_printf(buf, sizeof buf, "DEVIATION:%6.1QHz", dev);
-        goto show_computed;
+        j = 3;
+        int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
+        int ypos = 1 + (j/2)*(16) - y0;
+        cell_printf(xpos, ypos, FONT_b"DEVIATION:%6.1QHz", dev);
       } else if (setting.measurement == M_THD && markers[0].enabled && (markers[0].index << 5) > sweep_points ) {
         int old_unit = setting.unit;
         setting.unit = U_WATT;
@@ -1462,12 +1465,10 @@ static void cell_draw_marker_info(int x0, int y0)
         float thd = 100.0 * sqrtf(h/p);
         setting.unit = old_unit;
         ili9341_set_foreground(marker_color(markers[0].mtype));
-        plot_printf(buf, sizeof buf, "THD: %4.1f%%", thd);
 //        j = 1;
         int xpos = 1 + (j%2)*(WIDTH/2) + CELLOFFSETX - x0;
         int ypos = 1 + (j/2)*(16) - y0;
-        cell_drawstring_7x13(buf, xpos, ypos);
-//        cell_drawstring(buf, xpos, ypos);
+        cell_printf(xpos, ypos, FONT_b"THD: %4.1f%%", thd);
         break;
       }
     } else
